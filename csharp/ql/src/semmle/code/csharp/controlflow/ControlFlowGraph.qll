@@ -2473,7 +2473,7 @@ module ControlFlow {
         not startsBB(succ)
       }
 
-      predicate bbIndex(ControlFlowElement bbStart, ControlFlowElement cfe, int i) =
+      private predicate bbIndex(ControlFlowElement bbStart, ControlFlowElement cfe, int i) =
         shortestDistances(startsBB/1, intraBBSucc/2)(bbStart, cfe, i)
 
       private predicate succBB(PreBasicBlock pred, PreBasicBlock succ) {
@@ -2488,13 +2488,9 @@ module ControlFlow {
         idominance(entryBB/1, succBB/2)(_, dom, bb)
 
       class PreBasicBlock extends ControlFlowElement {
-        PreBasicBlock() {
-          startsBB(this)
-        }
+        PreBasicBlock() { startsBB(this) }
 
-        PreBasicBlock getASuccessor() {
-          result = succ(this.getLastElement(), _)
-        }
+        PreBasicBlock getASuccessor() { result = succ(this.getLastElement(), _) }
 
         PreBasicBlock getAPredecessor() {
           result.getASuccessor() = this
@@ -2547,6 +2543,22 @@ module ControlFlow {
             or
             exists(succExit(this.getLastElement(), c))
           ) > 1
+        }
+
+        private predicate isCandidateSuccessor(PreBasicBlock succ, ConditionalCompletion c) {
+          succ = succ(this.getLastElement(), c) and
+          forall(PreBasicBlock pred |
+            pred = succ.getAPredecessor() and pred != this |
+            succ.dominates(pred)
+          )
+        }
+
+        predicate controls(PreBasicBlock controlled, ConditionalSuccessor s) {
+          exists(PreBasicBlock succ, ConditionalCompletion c |
+            isCandidateSuccessor(succ, c) |
+            succ.dominates(controlled) and
+            s.matchesCompletion(c)
+          )
         }
       }
     }
@@ -3837,9 +3849,12 @@ module ControlFlow {
     }
 
     private cached module Cached {
+      private import semmle.code.csharp.controlflow.Guards as Guards
+
       cached
       newtype TPreSsaDef =
         TExplicitPreSsaDef(PreBasicBlocks::PreBasicBlock bb, int i, AssignableDefinition def, LocalScopeVariable v) {
+          Guards::Internal::forceCachingInSameStage() and
           PreSsa::forceCachingInSameStage() and
           PreSsa::assignableDefAt(bb, i, def, v)
         }
