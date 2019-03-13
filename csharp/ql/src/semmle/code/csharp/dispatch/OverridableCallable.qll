@@ -171,9 +171,41 @@ class OverridableCallable extends Callable {
     result = c.getDeclaringType()
   }
 
+  private predicate isDeclaringSubType(ValueOrRefType t) {
+    t = this.getDeclaringType().getASubType*()
+  }
+
+  pragma[noinline]
+  private Callable getAnOverrider0(ValueOrRefType t) {
+    not this.declaredInTypeWithTypeParameters() and
+    (
+      // A (transitive) overrider
+      result = this.getAnOverrider+() and
+      t = result.getDeclaringType()
+      or
+      // An interface implementation
+      result = this.getAnImplementorSubType(t)
+      or
+      // A (transitive) overrider of an interface implementation
+      result = this.getAnOverridingImplementor() and
+      t = result.getDeclaringType()
+    )
+  }
+
+  private Callable getAnOverrider1(ValueOrRefType t) {
+    result = this.getAnOverrider0(t)
+    or
+    exists(ValueOrRefType mid |
+      result = this.getAnOverrider1(mid) |
+      t = mid.getABaseType() and
+      isDeclaringSubType(t)
+    )
+  }
+
   /**
-   * Gets a callable defined in a sub type of `t` that overrides/implements
-   * this callable, if any.
+   * Gets a callable defined in a sub type of `t` (which is itself a sub type
+   * of this callable's declaring type) that overrides/implements this callable,
+   * if any.
    *
    * The type `t` may be a constructed type: For example, if `t = C<int>`,
    * then only callables defined in sub types of `C<int>` (and e.g. not
@@ -181,38 +213,8 @@ class OverridableCallable extends Callable {
    * contains a callable that overrides this callable, then only if `C2<int>`
    * is ever constructed will the callable in `C2` be considered valid.
    */
-  Callable getAnOverrider(TypeWithoutTypeParameters t) {
-    exists(OverridableCallable oc, ValueOrRefType sub |
-      result = oc.getAnOverriderAux(sub) and
-      t = oc.getAnOverriderBaseType(sub) and
-      oc = getABoundInstance()
-    )
-  }
-
-  // predicate folding to get proper join order
-  private Callable getAnOverriderAux(ValueOrRefType t) {
-    not declaredInTypeWithTypeParameters() and
-    (
-      // A (transitive) overrider
-      result = getAnOverrider+() and
-      t = result.getDeclaringType()
-      or
-      // An interface implementation
-      result = getAnImplementorSubType(t)
-      or
-      // A (transitive) overrider of an interface implementation
-      result = getAnOverridingImplementor() and
-      t = result.getDeclaringType()
-    )
-  }
-
-  private TypeWithoutTypeParameters getAnOverriderBaseType(ValueOrRefType t) {
-    exists(getAnOverriderAux(t)) and
-    exists(Type t0 | t0 = t.getABaseType*() |
-      result = t0
-      or
-      result = t0.(ConstructedType).getUnboundGeneric()
-    )
+  Callable getAnOverrider(ValueOrRefType t) {
+    result = this.getABoundInstance().getAnOverrider1(t)
   }
 
   /**
@@ -264,7 +266,7 @@ class OverridableMethod extends Method, OverridableCallable {
     result = OverridableCallable.super.getInherited(t)
   }
 
-  override Method getAnOverrider(TypeWithoutTypeParameters t) {
+  override Method getAnOverrider(ValueOrRefType t) {
     result = OverridableCallable.super.getAnOverrider(t)
   }
 }
@@ -311,7 +313,7 @@ class OverridableAccessor extends Accessor, OverridableCallable {
     result = OverridableCallable.super.getInherited(t)
   }
 
-  override Accessor getAnOverrider(TypeWithoutTypeParameters t) {
+  override Accessor getAnOverrider(ValueOrRefType t) {
     result = OverridableCallable.super.getAnOverrider(t)
   }
 }
