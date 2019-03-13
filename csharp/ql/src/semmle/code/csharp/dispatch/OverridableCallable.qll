@@ -135,27 +135,33 @@ class OverridableCallable extends Callable {
    * - `C2.M = C2.M.getInherited(C3)`.
    */
   Callable getInherited(SourceDeclarationType t) {
-    exists(Callable sourceDecl | result = getInherited1(t, sourceDecl) |
+    exists(Callable sourceDecl | result = this.getInherited2(t, sourceDecl) |
       hasSourceDeclarationCallable(t, sourceDecl)
     )
   }
 
-  private Callable getInherited0(SourceDeclarationType t) {
+  private Callable getInherited0(ValueOrRefType t) {
     // A (transitive, reflexive) overrider
-    t = this.hasOverrider(result).getASubType*().getSourceDeclaration()
+    t = this.hasOverrider(result)
+    or
+    // A (transitive) overrider of an interface implementation
+    t = this.hasOverridingImplementor(result)
+    or
+    exists(ValueOrRefType mid | result = this.getInherited0(mid) | t = mid.getASubType())
+  }
+
+  private Callable getInherited1(SourceDeclarationType t) {
+    exists(ValueOrRefType t0 | result = getInherited0(t0) | t = t0.getSourceDeclaration())
     or
     // An interface implementation
     exists(ValueOrRefType s |
       result = getAnImplementorSubType(s) and
       t = s.getSourceDeclaration()
     )
-    or
-    // A (transitive) overrider of an interface implementation
-    t = this.hasOverridingImplementor(result).getASubType*().getSourceDeclaration()
   }
 
-  private Callable getInherited1(SourceDeclarationType t, Callable sourceDecl) {
-    result = this.getInherited0(t) and
+  private Callable getInherited2(SourceDeclarationType t, Callable sourceDecl) {
+    result = this.getInherited1(t) and
     sourceDecl = result.getSourceDeclaration()
   }
 
@@ -172,7 +178,9 @@ class OverridableCallable extends Callable {
   }
 
   private predicate isDeclaringSubType(ValueOrRefType t) {
-    t = this.getDeclaringType().getASubType*()
+    t = this.getDeclaringType()
+    or
+    exists(ValueOrRefType mid | isDeclaringSubType(mid) | t = mid.getASubType())
   }
 
   pragma[noinline]
@@ -195,8 +203,7 @@ class OverridableCallable extends Callable {
   private Callable getAnOverrider1(ValueOrRefType t) {
     result = this.getAnOverrider0(t)
     or
-    exists(ValueOrRefType mid |
-      result = this.getAnOverrider1(mid) |
+    exists(ValueOrRefType mid | result = this.getAnOverrider1(mid) |
       t = mid.getABaseType() and
       isDeclaringSubType(t)
     )
@@ -213,9 +220,7 @@ class OverridableCallable extends Callable {
    * contains a callable that overrides this callable, then only if `C2<int>`
    * is ever constructed will the callable in `C2` be considered valid.
    */
-  Callable getAnOverrider(ValueOrRefType t) {
-    result = this.getABoundInstance().getAnOverrider1(t)
-  }
+  Callable getAnOverrider(ValueOrRefType t) { result = this.getABoundInstance().getAnOverrider1(t) }
 
   /**
    * Gets a bound instance of this callable.

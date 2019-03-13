@@ -222,8 +222,7 @@ private module Internal {
     }
 
     /**
-     * Gets a non-exact (see `hasQualifierType()`) qualifier type of this call
-     * that does not contain type parameters.
+     * Gets a non-exact (see `hasQualifierType()`) qualifier type of this call.
      */
     ValueOrRefType getANonExactQualifierType() {
       exists(TypeWithoutTypeParameters t |
