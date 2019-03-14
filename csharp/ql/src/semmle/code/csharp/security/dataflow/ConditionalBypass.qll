@@ -57,11 +57,18 @@ module UserControlledBypassOfSensitiveMethod {
     }
   }
 
+  pragma[noinline]
+  private predicate conditionControlsCall0(
+    SensitiveExecutionMethodCall call, Expr e, ControlFlow::SuccessorTypes::ConditionalSuccessor s
+  ) {
+    e.controlsElement(call, s)
+  }
+
   private predicate conditionControlsCall(
     SensitiveExecutionMethodCall call, SensitiveExecutionMethod def, Expr e, boolean cond
   ) {
     exists(ControlFlow::SuccessorTypes::BooleanSuccessor s | cond = s.getValue() |
-      e.controlsElement(call, s)
+      conditionControlsCall0(call, e, s)
     ) and
     def = call.getTarget()
   }
