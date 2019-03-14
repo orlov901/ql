@@ -83,16 +83,6 @@ abstract class StructuralComparisonConfiguration extends string {
     value = x.getValue()
   }
 
-  private ControlFlowElement getRankedChild(ControlFlowElement cfe, int rnk, int i) {
-    (candidateInternal(cfe, _) or candidateInternal(_, cfe)) and
-    i = rank[rnk](int j |
-        exists(ControlFlowElement child | child = cfe.getChild(j) |
-          not (j = -1 and cfe.(MemberAccess).targetIsThisInstance())
-        )
-      ) and
-    result = cfe.getChild(i)
-  }
-
   pragma[nomagic]
   private predicate sameByStructure0(
     ControlFlowElement x, ControlFlowElement y, int elementKind, int children
@@ -104,8 +94,7 @@ abstract class StructuralComparisonConfiguration extends string {
   }
 
   pragma[nomagic]
-  private predicate sameByStructure(ControlFlowElement x, ControlFlowElement y, int i) {
-    i = 0 and
+  private predicate sameByStructure(ControlFlowElement x, ControlFlowElement y) {
     // At least one of `x` and `y` must not have a value, they must have
     // the same kind, and the same number of children
     sameByStructure0(x, y, elementKind(y), getNumberOfActualChildren(y)) and
@@ -114,10 +103,14 @@ abstract class StructuralComparisonConfiguration extends string {
     (exists(referenceAttribute(x)) implies referenceAttribute(x) = referenceAttribute(y)) and
     // x is a member access on `this` iff y is
     (x.(MemberAccess).targetIsThisInstance() implies y.(MemberAccess).targetIsThisInstance()) and
-    (y.(MemberAccess).targetIsThisInstance() implies x.(MemberAccess).targetIsThisInstance())
-    or
-    exists(int j | sameByStructure(x, y, i - 1) |
-      sameInternal(getRankedChild(x, i, j), getRankedChild(y, i, j))
+    (y.(MemberAccess).targetIsThisInstance() implies x.(MemberAccess).targetIsThisInstance()) and
+    // All of their corresponding children must be structurally equal
+    forall(int i, Element xc |
+      xc = x.getChild(i) and
+      // exclude `this` qualifier, which has been checked above
+      not (i = -1 and x.(MemberAccess).targetIsThisInstance())
+    |
+      sameInternal(xc, y.getChild(i))
     )
   }
 
@@ -125,7 +118,7 @@ abstract class StructuralComparisonConfiguration extends string {
   private predicate sameInternal(ControlFlowElement x, ControlFlowElement y) {
     sameByValue(x, y)
     or
-    sameByStructure(x, y, getNumberOfActualChildren(x))
+    sameByStructure(x, y)
   }
 
   /**
