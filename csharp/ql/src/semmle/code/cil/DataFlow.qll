@@ -92,23 +92,23 @@ module DefUse {
   /**
    * A classification of variable references into reads and writes.
    */
-  private newtype RefKind =
-    Read() or
-    Write()
+  private newtype CilRefKind =
+    CilRead() or
+    CilWrite()
 
   /**
    * Holds if the `i`th node of basic block `bb` is a reference to `v`,
    * either a read (when `k` is `Read()`) or a write (when `k` is `Write()`).
    */
-  private predicate ref(BasicBlock bb, int i, StackVariable v, RefKind k) {
+  private predicate ref(BasicBlock bb, int i, StackVariable v, CilRefKind k) {
     exists(ReadAccess ra | bb.getNode(i) = ra |
       ra.getTarget() = v and
-      k = Read()
+      k = CilRead()
     )
     or
     exists(VariableUpdate vu | bb.getNode(i) = vu |
       vu.getVariable() = v and
-      k = Write()
+      k = CilWrite()
     )
   }
 
@@ -116,7 +116,7 @@ module DefUse {
    * Gets the (1-based) rank of the reference to `v` at the `i`th node of
    * basic block `bb`, which has the given reference kind `k`.
    */
-  private int refRank(BasicBlock bb, int i, StackVariable v, RefKind k) {
+  private int refRank(BasicBlock bb, int i, StackVariable v, CilRefKind k) {
     i = rank[result](int j | ref(bb, j, v, _)) and
     ref(bb, i, v, k)
   }
@@ -126,7 +126,7 @@ module DefUse {
    */
   private predicate liveAtEntry(BasicBlock bb, StackVariable v) {
     // The first reference to `v` inside `bb` is a read
-    refRank(bb, _, v, Read()) = 1
+    refRank(bb, _, v, CilRead()) = 1
     or
     // There is no reference to `v` inside `bb`, but `v` is live at entry
     // to a successor basic block of `bb`
@@ -147,12 +147,12 @@ module DefUse {
    */
   private predicate defReachesRank(BasicBlock bb, VariableUpdate vu, int rankix, StackVariable v) {
     exists(int i |
-      rankix = refRank(bb, i, v, Write()) and
+      rankix = refRank(bb, i, v, CilWrite()) and
       vu = bb.getNode(i)
     )
     or
     defReachesRank(bb, vu, rankix - 1, v) and
-    rankix = refRank(bb, _, v, Read())
+    rankix = refRank(bb, _, v, CilRead())
   }
 
   /**
@@ -168,7 +168,7 @@ module DefUse {
       exists(BasicBlock pred |
         pred = bb.getAPredecessor() and
         defReachesEndOfBlock(pred, vu, v) and
-        not exists(refRank(bb, _, v, Write()))
+        not exists(refRank(bb, _, v, CilWrite()))
       )
     )
   }
@@ -180,7 +180,7 @@ module DefUse {
   private predicate defReachesReadWithinBlock(StackVariable v, VariableUpdate vu, ReadAccess read) {
     exists(BasicBlock bb, int rankix, int i |
       defReachesRank(bb, vu, rankix, v) and
-      rankix = refRank(bb, i, v, Read()) and
+      rankix = refRank(bb, i, v, CilRead()) and
       read = bb.getNode(i)
     )
   }
@@ -191,7 +191,7 @@ module DefUse {
     defReachesReadWithinBlock(target, vu, use)
     or
     exists(BasicBlock bb, int i |
-      exists(refRank(bb, i, target, Read())) and
+      exists(refRank(bb, i, target, CilRead())) and
       use = bb.getNode(i) and
       defReachesEndOfBlock(bb.getAPredecessor(), vu, target) and
       not defReachesReadWithinBlock(target, _, use)

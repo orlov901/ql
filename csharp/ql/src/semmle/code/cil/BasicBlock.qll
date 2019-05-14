@@ -8,7 +8,7 @@ private import CIL
  * A basic block, that is, a maximal straight-line sequence of control flow nodes
  * without branches or joins.
  */
-class BasicBlock extends Internal::TBasicBlockStart {
+class BasicBlock extends Internal::TCilBasicBlockStart {
   /** Gets an immediate successor of this basic block, if any. */
   BasicBlock getASuccessor() { result.getFirstNode() = getLastNode().getASuccessor() }
 
@@ -58,7 +58,7 @@ class BasicBlock extends Internal::TBasicBlockStart {
   ControlFlowNode getANode() { result = getNode(_) }
 
   /** Gets the first control flow node in this basic block. */
-  ControlFlowNode getFirstNode() { this = Internal::TBasicBlockStart(result) }
+  ControlFlowNode getFirstNode() { this = Internal::TCilBasicBlockStart(result) }
 
   /** Gets the last control flow node in this basic block. */
   ControlFlowNode getLastNode() { result = getNode(length() - 1) }
@@ -249,7 +249,7 @@ cached
 private module Internal {
   /** Internal representation of basic blocks. */
   cached
-  newtype TBasicBlock = TBasicBlockStart(ControlFlowNode cfn) { startsBB(cfn) }
+  newtype TCilBasicBlock = TCilBasicBlockStart(ControlFlowNode cfn) { startsBB(cfn) }
 
   /** Holds if `cfn` starts a new basic block. */
   private predicate startsBB(ControlFlowNode cfn) {

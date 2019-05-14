@@ -8,7 +8,7 @@ private import DataFlowPrivateCached as C
  * An element, viewed as a node in a data flow graph. Either an expression
  * (`ExprNode`) or a parameter (`ParameterNode`).
  */
-class Node extends C::TNode {
+class Node extends C::TDataFlowNode {
   /** Gets the expression corresponding to this node, if any. */
   DotNet::Expr asExpr() { result = this.(ExprNode).getExpr() }
 

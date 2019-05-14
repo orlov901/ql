@@ -8,7 +8,7 @@ private import semmle.code.csharp.dispatch.Dispatch
 
 // Internal representation of call contexts
 cached
-private newtype TCallContext =
+private newtype TCallContext0 =
   TEmptyCallContext() or
   TArgNonDelegateCallContext(Expr arg) { exists(DispatchCall dc | arg = dc.getArgument(_)) } or
   TArgDelegateCallContext(DelegateCall dc, int i) { exists(dc.getArgument(i)) } or
@@ -21,7 +21,7 @@ private newtype TCallContext =
  *
  * A call context records the origin of data flow into callables.
  */
-class CallContext extends TCallContext {
+class CallContext extends TCallContext0 {
   /** Gets a textual representation of this call context. */
   string toString() { none() }
 

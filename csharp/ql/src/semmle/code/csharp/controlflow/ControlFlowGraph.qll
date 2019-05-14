@@ -24,7 +24,7 @@ module ControlFlow {
    * Only nodes that can be reached from the callable entry point are included in
    * the CFG.
    */
-  class Node extends TNode {
+  class Node extends TControlFlowNode {
     /** Gets a textual representation of this control flow node. */
     string toString() { none() }
 
@@ -2011,7 +2011,7 @@ module ControlFlow {
        * The control flow graph is pruned for unreachable nodes.
        */
       cached
-      newtype TNode =
+      newtype TControlFlowNode =
         TEntryNode(Callable c) { succEntrySplits(c, _, _, _) } or
         TExitNode(Callable c) {
           exists(Reachability::SameSplitsBlock b | b.isReachable(_) |

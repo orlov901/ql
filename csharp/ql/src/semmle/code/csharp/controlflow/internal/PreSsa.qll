@@ -169,21 +169,21 @@ private predicate outRefExitRead(PreBasicBlock bb, int i, LocalScopeVariable v) 
   (v.isRef() or v.(Parameter).isOut())
 }
 
-private newtype RefKind =
-  Read() or
-  Write(boolean certain) { certain = true or certain = false }
+private newtype PreRefKind =
+  PreRead() or
+  PreWrite(boolean certain) { certain = true or certain = false }
 
-private predicate ref(PreBasicBlock bb, int i, SimpleAssignable a, RefKind k) {
+private predicate ref(PreBasicBlock bb, int i, SimpleAssignable a, PreRefKind k) {
   (readAt(bb, i, _, a) or outRefExitRead(bb, i, a)) and
-  k = Read()
+  k = PreRead()
   or
   exists(AssignableDefinition def, boolean certain | assignableDefAt(bb, i, def, a) |
     (if def.getTargetAccess().isRefArgument() then certain = false else certain = true) and
-    k = Write(certain)
+    k = PreWrite(certain)
   )
 }
 
-private int refRank(PreBasicBlock bb, int i, SimpleAssignable a, RefKind k) {
+private int refRank(PreBasicBlock bb, int i, SimpleAssignable a, PreRefKind k) {
   i = rank[result](int j | ref(bb, j, a, _)) and
   ref(bb, i, a, k)
 }
@@ -194,16 +194,16 @@ private int maxRefRank(PreBasicBlock bb, SimpleAssignable a) {
 }
 
 private int firstReadOrCertainWrite(PreBasicBlock bb, SimpleAssignable a) {
-  result = min(int r, RefKind k |
+  result = min(int r, PreRefKind k |
       r = refRank(bb, _, a, k) and
-      k != Write(false)
+      k != PreWrite(false)
     |
       r
     )
 }
 
 predicate liveAtEntry(PreBasicBlock bb, SimpleAssignable a) {
-  refRank(bb, _, a, Read()) = firstReadOrCertainWrite(bb, a)
+  refRank(bb, _, a, PreRead()) = firstReadOrCertainWrite(bb, a)
   or
   not exists(firstReadOrCertainWrite(bb, a)) and
   liveAtExit(bb, a)
@@ -215,8 +215,8 @@ private predicate liveAtExit(PreBasicBlock bb, SimpleAssignable a) {
 
 predicate assignableDefAtLive(PreBasicBlock bb, int i, AssignableDefinition def, SimpleAssignable a) {
   assignableDefAt(bb, i, def, a) and
-  exists(int rnk | rnk = refRank(bb, i, a, Write(_)) |
-    rnk + 1 = refRank(bb, _, a, Read())
+  exists(int rnk | rnk = refRank(bb, i, a, PreWrite(_)) |
+    rnk + 1 = refRank(bb, _, a, PreRead())
     or
     rnk = maxRefRank(bb, a) and
     liveAtExit(bb, a)
@@ -231,31 +231,31 @@ predicate defAt(PreBasicBlock bb, int i, Definition def, SimpleAssignable a) {
   def = TPhiPreSsaDef(bb, a) and i = -1
 }
 
-private newtype SsaRefKind =
-  SsaRead() or
-  SsaDef()
+private newtype PreSsaRefKind =
+  PreSsaRead() or
+  PreSsaDef()
 
-private predicate ssaRef(PreBasicBlock bb, int i, SimpleAssignable a, SsaRefKind k) {
+private predicate ssaRef(PreBasicBlock bb, int i, SimpleAssignable a, PreSsaRefKind k) {
   readAt(bb, i, _, a) and
-  k = SsaRead()
+  k = PreSsaRead()
   or
   defAt(bb, i, _, a) and
-  k = SsaDef()
+  k = PreSsaDef()
 }
 
-private int ssaRefRank(PreBasicBlock bb, int i, SimpleAssignable a, SsaRefKind k) {
+private int ssaRefRank(PreBasicBlock bb, int i, SimpleAssignable a, PreSsaRefKind k) {
   i = rank[result](int j | ssaRef(bb, j, a, _)) and
   ssaRef(bb, i, a, k)
 }
 
 private predicate defReachesRank(PreBasicBlock bb, Definition def, SimpleAssignable a, int rnk) {
   exists(int i |
-    rnk = ssaRefRank(bb, i, a, SsaDef()) and
+    rnk = ssaRefRank(bb, i, a, PreSsaDef()) and
     defAt(bb, i, def, a)
   )
   or
   defReachesRank(bb, def, a, rnk - 1) and
-  rnk = ssaRefRank(bb, _, a, SsaRead())
+  rnk = ssaRefRank(bb, _, a, PreSsaRead())
 }
 
 private int maxSsaRefRank(PreBasicBlock bb, SimpleAssignable a) {
@@ -268,7 +268,7 @@ private predicate reachesEndOf(Definition def, SimpleAssignable a, PreBasicBlock
   or
   exists(PreBasicBlock mid |
     reachesEndOf(def, a, mid) and
-    not exists(ssaRefRank(mid, _, a, SsaDef())) and
+    not exists(ssaRefRank(mid, _, a, PreSsaDef())) and
     bb = mid.getASuccessor()
   )
 }
@@ -347,5 +347,5 @@ predicate ssaDefReachesEndOfBlock(PreBasicBlock bb, Definition def, SimpleAssign
   or
   ssaDefReachesEndOfBlockRec(bb, def, a) and
   liveAtExit(bb, a) and
-  not ssaRef(bb, _, a, SsaDef())
+  not ssaRef(bb, _, a, PreSsaDef())
 }

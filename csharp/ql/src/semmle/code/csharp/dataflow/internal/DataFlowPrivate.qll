@@ -179,7 +179,7 @@ module DataFlowPrivateCached {
   }
 
   cached
-  newtype TNode =
+  newtype TDataFlowNode =
     TExprNode(ControlFlow::Nodes::ElementNode cfn) { cfn.getElement() instanceof Expr } or
     TCilExprNode(CIL::Expr e) { e.getImplementation() instanceof CIL::BestImplementation } or
     TSsaDefinitionNode(Ssa::Definition def) or

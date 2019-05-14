@@ -45,32 +45,32 @@ module BaseSsa {
     )
   }
 
-  private newtype SsaRefKind =
-    SsaRead() or
-    SsaDef()
+  private newtype BaseSsaRefKind =
+    BaseSsaRead() or
+    BaseSsaDef()
 
   /**
    * Holds if the `i`th node of basic block `bb` is a reference to `v`,
    * either a read (when `k` is `SsaRead()`) or a write including phi nodes
    * (when `k` is `SsaDef()`).
    */
-  private predicate ssaRef(BasicBlock bb, int i, SimpleLocalScopeVariable v, SsaRefKind k) {
+  private predicate ssaRef(BasicBlock bb, int i, SimpleLocalScopeVariable v, BaseSsaRefKind k) {
     bb.getNode(i).getElement() = v.getAnAccess().(VariableRead) and
-    k = SsaRead()
+    k = BaseSsaRead()
     or
     defAt(bb, i, _, v) and
-    k = SsaDef()
+    k = BaseSsaDef()
     or
     needsPhiNode(bb, v) and
     i = -1 and
-    k = SsaDef()
+    k = BaseSsaDef()
   }
 
   /**
    * Gets the (1-based) rank of the reference to `v` at the `i`th node of basic
    * block `bb`, which has the given reference kind `k`.
    */
-  private int ssaRefRank(BasicBlock bb, int i, SimpleLocalScopeVariable v, SsaRefKind k) {
+  private int ssaRefRank(BasicBlock bb, int i, SimpleLocalScopeVariable v, BaseSsaRefKind k) {
     i = rank[result](int j | ssaRef(bb, j, v, _)) and
     ssaRef(bb, i, v, k)
   }
@@ -83,10 +83,10 @@ module BaseSsa {
   private predicate defReachesRank(
     BasicBlock bb, AssignableDefinition def, SimpleLocalScopeVariable v, int rnk
   ) {
-    exists(int i | rnk = ssaRefRank(bb, i, v, SsaDef()) | defAt(bb, i, def, v))
+    exists(int i | rnk = ssaRefRank(bb, i, v, BaseSsaDef()) | defAt(bb, i, def, v))
     or
     defReachesRank(bb, def, v, rnk - 1) and
-    rnk = ssaRefRank(bb, _, v, SsaRead())
+    rnk = ssaRefRank(bb, _, v, BaseSsaRead())
   }
 
   /**
@@ -102,7 +102,7 @@ module BaseSsa {
     or
     exists(BasicBlock mid |
       reachesEndOf(def, v, mid) and
-      not exists(ssaRefRank(mid, _, v, SsaDef())) and
+      not exists(ssaRefRank(mid, _, v, BaseSsaDef())) and
       bb = mid.getASuccessor()
     )
   }
@@ -115,12 +115,12 @@ module BaseSsa {
   AssignableRead getARead(AssignableDefinition def, SimpleLocalScopeVariable v) {
     exists(BasicBlock bb, int i, int rnk |
       result.getAControlFlowNode() = bb.getNode(i) and
-      rnk = ssaRefRank(bb, i, v, SsaRead())
+      rnk = ssaRefRank(bb, i, v, BaseSsaRead())
     |
       defReachesRank(bb, def, v, rnk)
       or
       reachesEndOf(def, v, bb.getAPredecessor()) and
-      not ssaRefRank(bb, _, v, SsaDef()) < rnk
+      not ssaRefRank(bb, _, v, BaseSsaDef()) < rnk
     )
   }
 }
