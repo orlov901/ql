@@ -775,6 +775,7 @@ module ControlFlow {
         TLastRecBooleanNegationCompletion() or
         TLastRecNonBooleanCompletion() or
         TLastRecBreakCompletion() or
+        TLastRecNonBreakCompletion() or
         TLastRecSwitchAbnormalCompletion() or
         TLastRecInvalidOperationException() or
         TLastRecNonContinueCompletion() or
@@ -980,7 +981,7 @@ module ControlFlow {
             // Last statement exits with any non-break completion
             exists(int last | last = max(int i | exists(ss.getStmt(i))) |
               result = ss.getStmt(last) and
-              c = TRec(TLastRecSpecificNegCompletion(any(BreakCompletion bc)))
+              c = TRec(TLastRecNonBreakCompletion())
             )
           )
         or
@@ -1137,7 +1138,7 @@ module ControlFlow {
         or
         result = lastRecSpecific(cfe, c, c)
         or
-        exists(TLastRecComputation rec, Completion c0 | result = lastRec(cfe, c0, rec) |
+        exists(TLastRecComputation rec, Completion c0 | result = lastRec(rec, cfe, c0) |
           rec = TLastRecSpecificNegCompletion(any(Completion c1 | c1 != c0)) and
           c = c0
           or
@@ -1148,7 +1149,7 @@ module ControlFlow {
           c = c0
           or
           rec = TLastRecAbnormalCompletion() and
-          not c0 instanceof NormalCompletion and
+          c0 instanceof AbnormalCompletion and
           c = c0
           or
           rec = TLastRecBooleanNegationCompletion() and
@@ -1167,6 +1168,10 @@ module ControlFlow {
           c0 instanceof BreakCompletion and
           c instanceof BreakNormalCompletion
           or
+          rec = TLastRecNonBreakCompletion() and
+          not c0 instanceof BreakCompletion and
+          c = c0
+          or
           rec = TLastRecSwitchAbnormalCompletion() and
           not c instanceof BreakCompletion and
           not c instanceof NormalCompletion and
@@ -1176,10 +1181,14 @@ module ControlFlow {
           or
           rec = TLastRecInvalidOperationException() and
           (c0.(MatchingCompletion).isNonMatch() or c0 instanceof FalseCompletion) and
-          c
-              .(ThrowCompletion)
-              .getExceptionClass()
-              .hasQualifiedName("System.InvalidOperationException")
+          c = any(InheritedCompletion ic |
+              ic.getUnderlyingCompletion() = c0 and
+              ic
+                  .getInheritedCompletion()
+                  .(ThrowCompletionDirect)
+                  .getExceptionClass()
+                  .hasQualifiedName("System.InvalidOperationException")
+            )
           or
           rec = TLastRecNonContinueCompletion() and
           not c0 instanceof BreakCompletion and
@@ -1195,16 +1204,30 @@ module ControlFlow {
         or
         // Last `catch` clause inherits throw completions from the `try` block,
         // when the clause does not match
-        exists(SpecificCatchClause scc |
+        exists(SpecificCatchClause scc, ThrowCompletion tc |
           scc = cfe and
           scc.isLast() and
-          throwMayBeUncaught(scc, c)
+          throwMayBeUncaught(scc, tc)
         |
           // Incompatible exception type: clause itself
-          result = scc
+          result = scc and
+          exists(MatchingCompletion mc |
+            mc.isNonMatch() and
+            mc.isValidFor(scc) and
+            c = any(InheritedCompletion ic |
+                ic.getUnderlyingCompletion() = mc and
+                ic.getInheritedCompletion() = tc.getInheritedCompletion()
+              )
+          )
           or
           // Incompatible filter
-          result = lastSpecificCatchClauseFilterClause(scc)
+          exists(FalseCompletion fc |
+            result = lastSpecificCatchClauseFilterClause(scc, fc) and
+            c = any(InheritedCompletion ic |
+                ic.getUnderlyingCompletion() = fc and
+                ic.getInheritedCompletion() = tc.getInheritedCompletion()
+              )
+          )
         )
         or
         cfe = any(TryStmt ts |
@@ -1226,8 +1249,12 @@ module ControlFlow {
                 exists(getBlockOrCatchFinallyPred(ts, any(NormalCompletion nc))) and
                 c = c0
                 or
-                exists(getBlockOrCatchFinallyPred(ts, c)) and
-                not c instanceof NormalCompletion
+                exists(AbnormalCompletion ac, InheritedCompletion ic |
+                  c = ic and
+                  exists(getBlockOrCatchFinallyPred(ts, ac)) and
+                  ac.getInheritedCompletion() = ic.getInheritedCompletion() and
+                  ic.getUnderlyingCompletion() = c0
+                )
               )
             )
           )
@@ -1235,7 +1262,7 @@ module ControlFlow {
 
       pragma[nomagic]
       private ControlFlowElement lastRec(
-        ControlFlowElement cfe, Completion c, TLastRecComputation rec
+        TLastRecComputation rec, ControlFlowElement cfe, Completion c
       ) {
         result = last(lastNonRec(cfe, TRec(rec)), c)
       }
@@ -1245,7 +1272,7 @@ module ControlFlow {
         ControlFlowElement cfe, Completion c1, Completion c2
       ) {
         exists(TLastRecComputation rec |
-          result = lastRec(cfe, c1, rec) and
+          result = lastRec(rec, cfe, c1) and
           rec = TLastRecSpecificCompletion(c2)
         )
       }
@@ -1271,8 +1298,10 @@ module ControlFlow {
         result = last(cc.getBlock(), c)
       }
 
-      private ControlFlowElement lastSpecificCatchClauseFilterClause(SpecificCatchClause scc) {
-        result = last(scc.getFilterClause(), _)
+      private ControlFlowElement lastSpecificCatchClauseFilterClause(
+        SpecificCatchClause scc, Completion c
+      ) {
+        result = last(scc.getFilterClause(), c)
       }
 
       /**
