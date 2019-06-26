@@ -48,7 +48,7 @@ private newtype TCompletion =
 /**
  * A completion of a statement or an expression.
  */
-class Completion extends TCompletion {
+abstract class Completion extends TCompletion {
   /**
    * Holds if this completion is valid for control flow element `cfe`.
    *
