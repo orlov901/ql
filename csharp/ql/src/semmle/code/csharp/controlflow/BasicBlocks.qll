@@ -383,10 +383,8 @@ private module JoinBlockPredecessors {
     idOf(jbp.(EntryBasicBlock).getCallable(), result)
   }
 
+  pragma[inline]
   string getSplitString(JoinBlockPredecessor jbp) {
-    result = jbp.getFirstNode().(ElementNode).getSplitsString()
-    or
-    not exists(jbp.getFirstNode().(ElementNode).getSplitsString()) and
     result = ""
   }
 }

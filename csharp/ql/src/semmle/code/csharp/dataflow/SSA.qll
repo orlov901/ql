@@ -1939,22 +1939,8 @@ module Ssa {
   }
   private import SsaImpl
 
-  private string getSplitString(Definition def) {
-    exists(BasicBlock bb, int i, ControlFlow::Node cfn |
-      definesAt(def, bb, i, _) and
-      result = cfn.(ControlFlow::Nodes::ElementNode).getSplitsString()
-    |
-      cfn = bb.getNode(i)
-      or
-      not exists(bb.getNode(i)) and
-      cfn = bb.getFirstNode()
-    )
-  }
-
+  pragma[inline]
   private string getToStringPrefix(Definition def) {
-    result = "[" + getSplitString(def) + "] "
-    or
-    not exists(getSplitString(def)) and
     result = ""
   }
 

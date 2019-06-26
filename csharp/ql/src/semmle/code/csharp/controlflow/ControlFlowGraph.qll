@@ -281,39 +281,18 @@ module ControlFlow {
      * different splits for the element.
      */
     class ElementNode extends Node, TElementNode {
-      private Splits splits;
-
       private ControlFlowElement cfe;
 
-      ElementNode() { this = TElementNode(cfe, splits) }
+      ElementNode() { this = TElementNode(cfe) }
 
       override Callable getEnclosingCallable() { result = cfe.getEnclosingCallable() }
 
       override ControlFlowElement getElement() { result = cfe }
 
       override string toString() {
-        result = "[" + this.getSplitsString() + "] " + cfe.toString()
-        or
-        not exists(this.getSplitsString()) and result = cfe.toString()
+        result = cfe.toString()
       }
-
-      /** Gets a comma-separated list of strings for each split in this node, if any. */
-      string getSplitsString() {
-        result = splits.toString() and
-        result != ""
-      }
-
-      /** Gets a split for this control flow node, if any. */
-      Split getASplit() { result = splits.getASplit() }
     }
-
-    class Split = SplitImpl;
-
-    class FinallySplit = FinallySplitting::FinallySplitImpl;
-
-    class ExceptionHandlerSplit = ExceptionHandlerSplitting::ExceptionHandlerSplitImpl;
-
-    class BooleanSplit = BooleanSplitting::BooleanSplitImpl;
   }
 
   class BasicBlock = BBs::BasicBlock;
@@ -335,8 +314,6 @@ module ControlFlow {
    * INTERNAL: Do not use.
    */
   module Internal {
-    import semmle.code.csharp.controlflow.internal.Splitting
-
     /**
      * Provides auxiliary classes and predicates used to construct the basic successor
      * relation on control flow elements.
@@ -1859,40 +1836,34 @@ module ControlFlow {
       cached
       newtype TNode =
         TEntryNode(Callable c) {
-          Stages::ControlFlowStage::forceCachingInSameStage() and
-          succEntrySplits(c, _, _, _)
+          Stages::ControlFlowStage::forceCachingInSameStage() 
         } or
-        TExitNode(Callable c) {
-          exists(Reachability::SameSplitsBlock b | b.isReachable(_) |
-            succExitSplits(b.getAnElement(), _, c, _)
-          )
-        } or
-        TElementNode(ControlFlowElement cfe, Splits splits) {
-          exists(Reachability::SameSplitsBlock b | b.isReachable(splits) | cfe = b.getAnElement())
-        }
+        TExitNode(Callable c)  or
+        TElementNode(ControlFlowElement cfe)
 
       /** Gets a successor node of a given flow type, if any. */
       cached
       Node getASuccessorByType(Node pred, SuccessorType t) {
         // Callable entry node -> callable body
-        exists(ControlFlowElement succElement, Splits succSplits |
-          result = TElementNode(succElement, succSplits)
+        exists(ControlFlowElement succElement |
+          result = TElementNode(succElement)
         |
-          succEntrySplits(pred.(Nodes::EntryNode).getCallable(), succElement, succSplits, t)
+          succElement = succEntry(pred.(Nodes::EntryNode).getCallable()) and
+          t instanceof SuccessorTypes::NormalSuccessor
         )
         or
-        exists(ControlFlowElement predElement, Splits predSplits |
-          pred = TElementNode(predElement, predSplits)
+        exists(ControlFlowElement predElement, Completion c |
+          pred = TElementNode(predElement) and
+          t.matchesCompletion(c)
         |
           // Element node -> callable exit
-          succExitSplits(predElement, predSplits, result.(Nodes::ExitNode).getCallable(), t)
+          result.(Nodes::ExitNode).getCallable() = succExit(predElement, c)
           or
           // Element node -> element node
-          exists(ControlFlowElement succElement, Splits succSplits, Completion c |
-            result = TElementNode(succElement, succSplits)
+          exists(ControlFlowElement succElement |
+            result = TElementNode(succElement)
           |
-            succSplits(predElement, predSplits, succElement, succSplits, c) and
-            t.matchesCompletion(c)
+            succElement = succ(predElement, c)
           )
         )
       }
