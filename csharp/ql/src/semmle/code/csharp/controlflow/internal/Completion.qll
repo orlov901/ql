@@ -38,9 +38,7 @@ private newtype TCompletion =
   TBreakCompletion() or
   TBreakNormalCompletion() or
   TContinueCompletion() or
-  TGotoLabelCompletion(GotoLabelStmt goto) or
-  TGotoCaseCompletion(GotoCaseStmt goto) or
-  TGotoDefaultCompletion() or
+  TGotoCompletion(string label) { label = any(GotoStmt gs).getLabel() } or
   TThrowCompletion(ExceptionClass ec) or
   TExitCompletion() or
   TInheritedCompletion(NormalCompletion underlying, InheritableCompletion inherited)
@@ -109,22 +107,17 @@ class Completion extends TCompletion {
                   if cfe instanceof ContinueStmt
                   then this = TContinueCompletion()
                   else
-                    if cfe instanceof GotoDefaultStmt
-                    then this = TGotoDefaultCompletion()
+                    if cfe instanceof GotoStmt
+                    then this = TGotoCompletion(cfe.(GotoStmt).getLabel())
                     else
-                      if cfe instanceof GotoStmt
-                      then
-                        this = TGotoLabelCompletion(cfe) or
-                        this = TGotoCaseCompletion(cfe)
+                      if cfe instanceof ReturnStmt
+                      then this = TReturnCompletion()
                       else
-                        if cfe instanceof ReturnStmt
-                        then this = TReturnCompletion()
-                        else
-                          if cfe instanceof YieldBreakStmt
-                          then
-                            // `yield break` behaves like a return statement
-                            this = TReturnCompletion()
-                          else this = TNormalCompletion()
+                        if cfe instanceof YieldBreakStmt
+                        then
+                          // `yield break` behaves like a return statement
+                          this = TReturnCompletion()
+                        else this = TNormalCompletion()
     )
   }
 
@@ -735,75 +728,23 @@ private class ContinueCompletionInherited extends ContinueCompletion, InheritedC
  * A completion that represents evaluation of a statement or an
  * expression resulting in a `goto` jump.
  */
-abstract class GotoCompletion extends AbnormalCompletion { }
-
-/**
- * A completion that represents evaluation of a statement or an
- * expression resulting in a `goto label` jump.
- */
-abstract class GotoLabelCompletion extends GotoCompletion {
+abstract class GotoCompletion extends AbnormalCompletion {
   /** Gets the target of the `goto label` completion. */
-  string getLabel() { result = this.getGotoStmt().getLabel() }
-
-  /** Gets the statement that resulted in this `goto label` completion. */
-  abstract GotoLabelStmt getGotoStmt();
+  abstract string getLabel();
 }
 
-private class GotoLabelCompletionDirect extends GotoLabelCompletion, InheritableCompletion,
-  TGotoLabelCompletion {
-  override GotoLabelStmt getGotoStmt() { this = TGotoLabelCompletion(result) }
+private class GotoCompletionDirect extends GotoCompletion, InheritableCompletion, TGotoCompletion {
+  override string getLabel() { this = TGotoCompletion(result) }
 
   override string toString() { result = "goto(" + getLabel() + ")" }
 }
 
-private class GotoLabelCompletionInherited extends GotoLabelCompletion, InheritedCompletion {
-  private TGotoLabelCompletion inherited;
+private class GotoCompletionInherited extends GotoCompletion, InheritedCompletion {
+  private TGotoCompletion inherited;
 
-  GotoLabelCompletionInherited() { this = TInheritedCompletion(_, inherited) }
+  GotoCompletionInherited() { this = TInheritedCompletion(_, inherited) }
 
-  override GotoLabelStmt getGotoStmt() { inherited = TGotoLabelCompletion(result) }
-}
-
-/**
- * A completion that represents evaluation of a statement or an
- * expression resulting in a `goto case` jump.
- */
-abstract class GotoCaseCompletion extends GotoCompletion {
-  /** Gets the target of the `goto case` completion. */
-  string getLabel() { result = this.getGotoStmt().getLabel() }
-
-  /** Gets the statement that resulted in this `goto case` completion. */
-  abstract GotoCaseStmt getGotoStmt();
-}
-
-private class GotoCaseCompletionDirect extends GotoCaseCompletion, InheritableCompletion,
-  TGotoCaseCompletion {
-  override GotoCaseStmt getGotoStmt() { this = TGotoCaseCompletion(result) }
-
-  override string toString() { result = "goto case(" + getGotoStmt().getLabel() + ")" }
-}
-
-private class GotoCaseCompletionInherited extends GotoCaseCompletion, InheritedCompletion {
-  private TGotoCaseCompletion inherited;
-
-  GotoCaseCompletionInherited() { this = TInheritedCompletion(_, inherited) }
-
-  override GotoCaseStmt getGotoStmt() { inherited = TGotoCaseCompletion(result) }
-}
-
-/**
- * A completion that represents evaluation of a statement or an
- * expression resulting in a `goto default` jump.
- */
-abstract class GotoDefaultCompletion extends GotoCompletion { }
-
-private class GotoDefaultCompletionDirect extends GotoDefaultCompletion, InheritableCompletion,
-  TGotoDefaultCompletion {
-  override string toString() { result = "goto default" }
-}
-
-private class GotoDefaultCompletionInherited extends GotoDefaultCompletion, InheritedCompletion {
-  GotoDefaultCompletionInherited() { this = TInheritedCompletion(_, TGotoDefaultCompletion()) }
+  override string getLabel() { inherited = TGotoCompletion(result) }
 }
 
 /**
