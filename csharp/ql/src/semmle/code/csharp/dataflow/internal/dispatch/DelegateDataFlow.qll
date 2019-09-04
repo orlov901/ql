@@ -6,8 +6,9 @@
 
 import csharp
 private import dotnet
-private import semmle.code.csharp.dataflow.CallContext
-private import semmle.code.csharp.dataflow.internal.DataFlowDispatch
+private import DataFlowImpl
+private import DataFlowImplCommon
+private import semmle.code.csharp.dataflow.internal.DataFlowDispatchCommon
 private import semmle.code.csharp.dataflow.internal.DataFlowPrivate
 private import semmle.code.csharp.dataflow.internal.DataFlowPublic
 private import semmle.code.csharp.dispatch.Dispatch
@@ -30,6 +31,25 @@ private class DelegateFlowSource extends DataFlow::ExprNode {
 
 /** A sink of flow for a delegate expression. */
 abstract private class DelegateFlowSink extends DataFlow::ExprNode {
+
+  private 
+  predicate well2(DelegateFlowSource dfs, CallContext ctx) {
+    exists(Blah x, PathNode source, PathNode sink|
+      x.hasFlowPath(source, sink) and
+      dfs = source.getNode() and
+      this = sink.getNode()
+      |
+      source.getNode() = sink.getNode() and
+      ctx instanceof CallContextAny
+      or
+      exists(PathNode last |
+        source.getASuccessor*() = last and
+        last.getASuccessor() = sink and
+        ctx = last.getCallContext()
+      )
+    )
+  }
+
   /**
    * Gets an actual run-time target of this delegate call in the given call
    * context, if any. The call context records the *last* call required to
@@ -82,16 +102,24 @@ abstract private class DelegateFlowSink extends DataFlow::ExprNode {
    * possible delegates resolved on line 6.
    */
   cached
-  Callable getARuntimeTarget(CallContext context) {
-    exists(DelegateFlowSource dfs |
-      flowsFrom(this, dfs, _, context) and
+  Callable getARuntimeTarget(CallContext::CallContext context) {
+    exists(DelegateFlowSource dfs, CallContext ctx |
+      well2(dfs, ctx) and
       result = dfs.getCallable()
+    |
+      exists(DataFlowCall call, int i |
+        ctx = TSpecificCall(call, i, _) |
+        context.(CallContext::ArgumentCallContext).isArgument(call.getExpr(), i)
+      )
+      or
+      not ctx instanceof TSpecificCall and
+      context instanceof CallContext::EmptyCallContext
     )
   }
 }
 
 /** A delegate call expression. */
-library class DelegateCallExpr extends DelegateFlowSink {
+class DelegateCallExpr extends DelegateFlowSink {
   DelegateCall dc;
 
   DelegateCallExpr() { this.getExpr() = dc.getDelegateExpr() }
@@ -101,47 +129,14 @@ library class DelegateCallExpr extends DelegateFlowSink {
 }
 
 /** A delegate expression that is passed as the argument to a library callable. */
-library class DelegateArgumentToLibraryCallable extends Expr {
-  DelegateType dt;
-
-  Call call;
-
-  DelegateArgumentToLibraryCallable() {
-    exists(Callable callable, Parameter p |
-      this = call.getArgumentForParameter(p) and
-      callable = call.getTarget() and
-      callable.fromLibrary() and
-      dt = p.getType().(SystemLinqExpressions::DelegateExtType).getDelegateType()
-    )
-  }
-
-  /** Gets the call that this argument belongs to. */
-  Call getCall() { result = call }
-
-  /** Gets the delegate type of this argument. */
-  DelegateType getDelegateType() { result = dt }
-
-  /**
-   * Gets an actual run-time target of this delegate call in the given call
-   * context, if any. The call context records the *last* call required to
-   * resolve the target, if any. Example:
-   */
-  Callable getARuntimeTarget(CallContext context) {
-    exists(DelegateArgumentToLibraryCallableSink sink | sink.getExpr() = this |
-      result = sink.getARuntimeTarget(context)
-    )
-  }
-}
-
-/** A delegate expression that is passed as the argument to a library callable. */
-private class DelegateArgumentToLibraryCallableSink extends DelegateFlowSink {
+class DelegateArgumentToLibraryCallableSink extends DelegateFlowSink {
   DelegateArgumentToLibraryCallableSink() {
     this.getExpr() instanceof DelegateArgumentToLibraryCallable
   }
 }
 
 /** A delegate expression that is added to an event. */
-library class AddEventSource extends DelegateFlowSink {
+class AddEventSource extends DelegateFlowSink {
   AddEventExpr ae;
 
   AddEventSource() { this.getExpr() = ae.getRValue() }
@@ -167,124 +162,37 @@ private class NonDelegateCall extends Expr {
   Expr getArgument(int i) { result = dc.getArgument(i) }
 }
 
-private class NormalReturnNode extends Node {
-  NormalReturnNode() { this.(ReturnNode).getKind() instanceof NormalReturnKind }
+private class Blah extends Configuration {
+  Blah() { this = "blah" }
+
+  override predicate isSource(Node source) {
+    source instanceof DelegateFlowSource
+  }
+
+  override predicate isSink(Node sink) {
+    sink instanceof DelegateFlowSink
+  }
+
+  override predicate isAdditionalFlowStep(Node node1, Node node2) {
+    // TODO: Splitting
+    node1.asExpr() = node2.asExpr().(DelegateCreation).getArgument()
+  }
 }
 
-/**
- * Holds if data can flow (inter-procedurally) to delegate `sink` from
- * `node`. This predicate searches backwards from `sink` to `node`.
- *
- * The parameter `isReturned` indicates whether the path from `sink` to
- * `node` goes through a returned expression. The call context `lastCall`
- * records the last call on the path from `node` to `sink`, if any.
- */
-private predicate flowsFrom(
-  DelegateFlowSink sink, DataFlow::Node node, boolean isReturned, CallContext lastCall
-) {
-  // Base case
-  sink = node and
-  isReturned = false and
-  lastCall instanceof EmptyCallContext
-  or
-  // Local flow
-  exists(DataFlow::Node mid | flowsFrom(sink, mid, isReturned, lastCall) |
-    DataFlow::localFlowStep(node, mid) or
-    node.asExpr() = mid.asExpr().(DelegateCreation).getArgument()
-  )
-  or
-  // Flow through static field or property
-  exists(DataFlow::Node mid |
-    flowsFrom(sink, mid, _, _) and
-    jumpStep(node, mid) and
-    isReturned = false and
-    lastCall instanceof EmptyCallContext
-  )
-  or
-  // Flow into a callable (non-delegate call)
-  exists(ExplicitParameterNode mid, CallContext prevLastCall, NonDelegateCall call, Parameter p |
-    flowsFrom(sink, mid, isReturned, prevLastCall) and
-    isReturned = false and
-    p = mid.getParameter() and
-    flowIntoNonDelegateCall(call, node.asExpr(), p) and
-    lastCall = getLastCall(prevLastCall, call, p.getPosition())
-  )
-  or
-  // Flow into a callable (delegate call)
-  exists(
-    ExplicitParameterNode mid, CallContext prevLastCall, DelegateCall call, Callable c, Parameter p,
-    int i
-  |
-    flowsFrom(sink, mid, isReturned, prevLastCall) and
-    isReturned = false and
-    flowIntoDelegateCall(call, c, node.asExpr(), i) and
-    c.getParameter(i) = p and
-    p = mid.getParameter() and
-    lastCall = getLastCall(prevLastCall, call, i)
-  )
-  or
-  // Flow out of a callable (non-delegate call).
-  exists(DataFlow::ExprNode mid |
-    flowsFrom(sink, mid, _, lastCall) and
-    isReturned = true and
-    flowOutOfNonDelegateCall(mid.getExpr(), node)
-  )
-  or
-  // Flow out of a callable (delegate call).
-  exists(DataFlow::ExprNode mid |
-    flowsFrom(sink, mid, _, _) and
-    isReturned = true and
-    flowOutOfDelegateCall(mid.getExpr(), node, lastCall)
-  )
+predicate well(Blah b, Node source, Node sink) {
+  b.hasFlow(source, sink)
 }
 
-/**
- * Gets the last call when tracking flow into `call`. The context
- * `prevLastCall` is the previous last call, so the result is the
- * previous call if it exists, otherwise `call` is the last call.
- */
-bindingset[call, i]
-private CallContext getLastCall(CallContext prevLastCall, Expr call, int i) {
-  prevLastCall instanceof EmptyCallContext and
-  result.(ArgumentCallContext).isArgument(call, i)
-  or
-  prevLastCall instanceof ArgumentCallContext and
-  result = prevLastCall
-}
-
-pragma[noinline]
-private predicate flowIntoNonDelegateCall(NonDelegateCall call, Expr arg, DotNet::Parameter p) {
-  exists(DotNet::Callable callable, int i |
-    callable = call.getARuntimeTarget() and
-    p = callable.getAParameter() and
-    arg = call.getArgument(i) and
-    i = p.getPosition()
-  )
-}
-
-pragma[noinline]
-private predicate flowIntoDelegateCall(DelegateCall call, Callable c, Expr arg, int i) {
-  exists(DelegateFlowSource dfs, DelegateCallExpr dce |
-    // the call context is irrelevant because the delegate call
-    // itself will be the context
-    flowsFrom(dce, dfs, _, _) and
-    arg = call.getArgument(i) and
-    c = dfs.getCallable() and
-    call = dce.getDelegateCall()
-  )
-}
-
-pragma[noinline]
-private predicate flowOutOfNonDelegateCall(NonDelegateCall call, NormalReturnNode ret) {
-  call.getARuntimeTarget() = ret.getEnclosingCallable()
-}
-
-pragma[noinline]
-private predicate flowOutOfDelegateCall(DelegateCall dc, NormalReturnNode ret, CallContext lastCall) {
-  exists(DelegateFlowSource dfs, DelegateCallExpr dce, Callable c |
-    flowsFrom(dce, dfs, _, lastCall) and
-    ret.getEnclosingCallable() = c and
-    c = dfs.getCallable() and
-    dc = dce.getDelegateCall()
-  )
-}
+predicate well2(PathNode source, PathNode sink, CallContext ctx) {
+    exists(Blah x|
+      x.hasFlowPath(source, sink) |
+      source.getNode() = sink.getNode() and
+      ctx instanceof CallContextAny
+      or
+      exists(PathNode last |
+        source.getASuccessor*() = last and
+        last.getASuccessor() = sink and
+        ctx = last.getCallContext()
+      )
+    )
+  }

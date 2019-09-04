@@ -1576,6 +1576,9 @@ abstract class PathNode extends TPathNode {
   /** Gets a successor of this node, if any. */
   abstract PathNode getASuccessor();
 
+  /** Gets the call context of this node, if any. */
+  abstract CallContext getCallContext();
+
   private string ppAp() {
     this instanceof PathNodeSink and result = ""
     or
@@ -1587,7 +1590,7 @@ abstract class PathNode extends TPathNode {
   private string ppCtx() {
     this instanceof PathNodeSink and result = ""
     or
-    result = " <" + this.(PathNodeMid).getCallContext().toString() + ">"
+    result = " <" + this.getCallContext().toString() + ">"
   }
 }
 
@@ -1624,7 +1627,7 @@ private class PathNodeMid extends PathNode, TPathNodeMid {
 
   override Node getNode() { result = node }
 
-  CallContext getCallContext() { result = cc }
+  override CallContext getCallContext() { result = cc }
 
   AccessPath getAp() { result = ap }
 
@@ -1686,6 +1689,8 @@ private class PathNodeSink extends PathNode, TPathNodeSink {
   PathNodeSink() { this = TPathNodeSink(node, config) }
 
   override Node getNode() { result = node }
+
+  override CallContext getCallContext() { none() }
 
   override Configuration getConfiguration() { result = config }
 

@@ -2,7 +2,7 @@ private import csharp
 private import cil
 private import dotnet
 private import DataFlowPrivate
-private import DelegateDataFlow
+private import semmle.code.csharp.dataflow.internal.dispatch.DelegateDataFlow
 private import semmle.code.csharp.dispatch.Dispatch
 private import semmle.code.csharp.frameworks.system.Collections
 private import semmle.code.csharp.frameworks.system.collections.Generic
@@ -92,7 +92,9 @@ DotNet::Callable getARuntimeTarget(DelegateDataFlowCall call, CallContext::CallC
   exists(ControlFlow::Nodes::ElementNode cfn |
     cfn = call.(ImplicitDelegateDataFlowCall).getControlFlowNode()
   |
-    result = cfn.getElement().(DelegateArgumentToLibraryCallable).getARuntimeTarget(cc)
+    exists(DelegateArgumentToLibraryCallableSink sink | sink.getExpr() = cfn.getElement() |
+      result = sink.getARuntimeTarget(cc)
+    )
   )
 }
 

@@ -2,10 +2,10 @@ private import csharp
 private import cil
 private import dotnet
 private import DataFlowPrivate
-private import DelegateDataFlow
 private import semmle.code.csharp.dispatch.Dispatch
 private import semmle.code.csharp.frameworks.system.Collections
 private import semmle.code.csharp.frameworks.system.collections.Generic
+private import semmle.code.csharp.frameworks.system.linq.Expressions
 
 /**
  * Gets a source declaration of callable `c` that has a body.
@@ -286,6 +286,28 @@ class ExplicitDelegateDataFlowCall extends DelegateDataFlowCall, TExplicitDelega
   override string toString() { result = cfn.toString() }
 
   override Location getLocation() { result = cfn.getLocation() }
+}
+
+/** A delegate expression that is passed as the argument to a library callable. */
+class DelegateArgumentToLibraryCallable extends Expr {
+  DelegateType dt;
+
+  Call call;
+
+  DelegateArgumentToLibraryCallable() {
+    exists(Callable callable, Parameter p |
+      this = call.getArgumentForParameter(p) and
+      callable = call.getTarget() and
+      callable.fromLibrary() and
+      dt = p.getType().(SystemLinqExpressions::DelegateExtType).getDelegateType()
+    )
+  }
+
+  /** Gets the call that this argument belongs to. */
+  Call getCall() { result = call }
+
+  /** Gets the delegate type of this argument. */
+  DelegateType getDelegateType() { result = dt }
 }
 
 /**

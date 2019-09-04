@@ -5,7 +5,6 @@ private import DataFlowPublic
 private import DataFlowDispatch
 private import DataFlowImplCommon
 private import ControlFlowReachability
-private import DelegateDataFlow
 private import semmle.code.csharp.Caching
 private import semmle.code.csharp.ExprOrStmtParent
 private import semmle.code.csharp.dataflow.LibraryTypeDataFlow
@@ -771,7 +770,7 @@ private module ArgumentNodes {
     override predicate argumentOf(DataFlowCall call, int pos) {
       exists(ImplicitCapturedParameterNode p, boolean additionalCalls |
         this.flowsInto(p, additionalCalls) and
-        p.isParameterOf(getARuntimeTarget(call), pos)
+        p.isParameterOf(_, pos)
       |
         if call instanceof TransitiveCapturedDataFlowCall
         then additionalCalls = true and call.getControlFlowNode() = cfn

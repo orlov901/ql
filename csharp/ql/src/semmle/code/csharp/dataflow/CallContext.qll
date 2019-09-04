@@ -3,7 +3,7 @@
  */
 
 import csharp
-private import semmle.code.csharp.dataflow.internal.DelegateDataFlow
+private import semmle.code.csharp.dataflow.internal.DataFlowDispatchCommon
 private import semmle.code.csharp.dispatch.Dispatch
 
 // Internal representation of call contexts

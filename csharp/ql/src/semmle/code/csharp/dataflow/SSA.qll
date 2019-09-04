@@ -1037,7 +1037,7 @@ module Ssa {
     }
 
     private module SimpleDelegateAnalysis {
-      private import semmle.code.csharp.dataflow.internal.DelegateDataFlow
+      private import semmle.code.csharp.dataflow.internal.dispatch.DelegateDataFlow
       private import semmle.code.csharp.dataflow.internal.Steps
       private import semmle.code.csharp.frameworks.system.linq.Expressions
 
