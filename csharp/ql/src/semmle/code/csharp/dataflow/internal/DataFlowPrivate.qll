@@ -771,7 +771,7 @@ private module ArgumentNodes {
     override predicate argumentOf(DataFlowCall call, int pos) {
       exists(ImplicitCapturedParameterNode p, boolean additionalCalls |
         this.flowsInto(p, additionalCalls) and
-        p.isParameterOf(call.getARuntimeTarget(), pos)
+        p.isParameterOf(getARuntimeTarget(call), pos)
       |
         if call instanceof TransitiveCapturedDataFlowCall
         then additionalCalls = true and call.getControlFlowNode() = cfn
