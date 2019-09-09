@@ -20,7 +20,10 @@ namespace RemoteFlowSource
     using System.Collections.Generic;
 
     [DataContract]
-    public class SampleData { }
+    public class SampleData {
+      [DataMember]
+      public string Member;
+    }
 
     [ServiceContract]
     public interface ISampleService
@@ -37,7 +40,7 @@ namespace RemoteFlowSource
             Use(textBox);
         }
 
-        public string Operation(SampleData sampleData, string taint) => sampleData + taint;
+        public string Operation(SampleData sampleData, string taint) => sampleData.Member + taint;
 
         public static void Use(Object o) { }
 

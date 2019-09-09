@@ -1210,33 +1210,6 @@ class SystemConvertFlow extends LibraryTypeDataFlow, SystemConvertClass {
   }
 }
 
-/**
- * Data flow for WCF data contracts.
- *
- * Flow is defined from a WCF data contract object to any of its data member
- * properties. This flow model only makes sense from a taint-tracking perspective
- * (a tainted data contract object implies tainted data members).
- */
-class DataContractFlow extends LibraryTypeDataFlow, DataContractClass {
-  override predicate callableFlow(
-    CallableFlowSource source, CallableFlowSink sink, SourceDeclarationCallable c,
-    boolean preservesValue
-  ) {
-    exists(Property p |
-      propertyFlow(p) and
-      source = TCallableFlowSourceQualifier() and
-      sink = TCallableFlowSinkReturn() and
-      c = p.getGetter()
-    ) and
-    preservesValue = false
-  }
-
-  private predicate propertyFlow(Property p) {
-    p.getDeclaringType() = this and
-    p.getAnAttribute() instanceof DataMemberAttribute
-  }
-}
-
 /** Data flow for `System.Web.HttpCookie`. */
 class SystemWebHttpCookieFlow extends LibraryTypeDataFlow, SystemWebHttpCookie {
   override predicate callableFlow(

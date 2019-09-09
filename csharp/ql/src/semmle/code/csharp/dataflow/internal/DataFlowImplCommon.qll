@@ -327,6 +327,10 @@ private module ImplCommon {
     )
   }
 
+  private predicate getter0(ParameterNode p, int c) {
+    c = strictcount(Content f, ReturnKind kind | getter(p, f, kind))
+  }
+
   cached
   predicate localStoreReadStep(Node node1, Node node2) {
     exists(Node mid1, Node mid2, Content f |

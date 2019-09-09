@@ -100,6 +100,19 @@ class WcfRemoteFlowSource extends RemoteFlowSource, DataFlow::ParameterNode {
   override string getSourceType() { result = "web service input" }
 }
 
+/** A read of a data member (WCF based web service). */
+class DataMemberRead extends RemoteFlowSource, DataFlow::ExprNode {
+  DataMemberRead() {
+    exists(Property p |
+      p.getDeclaringType() instanceof DataContractClass and
+      p.getAnAttribute() instanceof DataMemberAttribute and
+      this.getExpr().(AssignableRead).getTarget() = p
+    )
+  }
+
+  override string getSourceType() { result = "web service input" }
+}
+
 /** A data flow source of remote user input (ASP.NET web service). */
 class AspNetServiceRemoteFlowSource extends RemoteFlowSource, DataFlow::ParameterNode {
   AspNetServiceRemoteFlowSource() {
