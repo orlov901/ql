@@ -15,28 +15,69 @@ import Type
 private import semmle.code.csharp.frameworks.System
 private import semmle.code.csharp.frameworks.system.collections.Generic
 
-/**
- * INTERNAL: Do not use.
- *
- * Holds if there exists an implicit conversion from `fromType` to `toType`.
- *
- * 6.1: Implicit type conversions.
- *
- * The following conversions are classified as implicit conversions:
- *
- * - Identity conversions
- * - Implicit numeric conversions
- * - Implicit nullable conversions
- * - Implicit reference conversions
- * - Boxing conversions
- * - User-defined implicit conversions
- */
 cached
-predicate implicitConversion(Type fromType, Type toType) {
-  implicitConversionNonNull(fromType, toType)
-  or
-  defaultNullConversion(fromType, toType)
+private module Cached {
+  /**
+   * INTERNAL: Do not use.
+   *
+   * Holds if there exists an implicit conversion from `fromType` to `toType`.
+   *
+   * 6.1: Implicit type conversions.
+   *
+   * The following conversions are classified as implicit conversions:
+   *
+   * - Identity conversions
+   * - Implicit numeric conversions
+   * - Implicit nullable conversions
+   * - Implicit reference conversions
+   * - Boxing conversions
+   * - User-defined implicit conversions
+   */
+  cached
+  predicate implicitConversion(Type fromType, Type toType) {
+    implicitConversionNonNull(fromType, toType)
+    or
+    defaultNullConversion(fromType, toType)
+  }
+
+  cached
+  predicate defaultNullConversion(Type fromType, Type toType) {
+    fromType instanceof NullType and convNullType(toType)
+  }
+
+  /**
+   * INTERNAL: Do not use.
+   *
+   * Holds if there exists an identity conversion from `fromType` to `toType`.
+   *
+   * 6.1.1: Identity conversion.
+   *
+   * Equality modulo `object` and `dynamic`, that is, two types are considered
+   * identical if they are syntactically equal when replacing all occurrences
+   * of `dynamic` with `object`.
+   */
+  cached
+  predicate convIdentity(Type fromType, Type toType) {
+    fromType = toType
+    or
+    Identity::convIdentityStrict(fromType, toType)
+  }
+
+  /**
+   * INTERNAL: Do not use.
+   *
+   * Holds if there is a constant expression conversion from `fromType` to `toType`.
+   *
+   * 6.1.9: Implicit constant expression conversions.
+   */
+  cached
+  predicate convConstantExpr(SignedIntegralConstantExpr e, SimpleType toType) {
+    convConstantIntExpr(e, toType)
+    or
+    convConstantLongExpr(e) and toType instanceof ULongType
+  }
 }
+import Cached
 
 private predicate implicitConversionNonNull(Type fromType, Type toType) {
   convIdentity(fromType, toType)
@@ -69,23 +110,6 @@ private class ArrayElementType extends Type {
 /** A type that is an argument in a constructed type. */
 private class TypeArgument extends Type {
   TypeArgument() { this = any(ConstructedType ct).getATypeArgument() }
-}
-
-/**
- * INTERNAL: Do not use.
- *
- * Holds if there exists an identity conversion from `fromType` to `toType`.
- *
- * 6.1.1: Identity conversion.
- *
- * Equality modulo `object` and `dynamic`, that is, two types are considered
- * identical if they are syntactically equal when replacing all occurrences
- * of `dynamic` with `object`.
- */
-predicate convIdentity(Type fromType, Type toType) {
-  fromType = toType
-  or
-  Identity::convIdentityStrict(fromType, toType)
 }
 
 private module Identity {
@@ -460,13 +484,6 @@ predicate convNullableType(ValueOrRefType fromType, NullableType toType) {
   )
 }
 
-// This is a deliberate, small Cartesian product, so we have manually lifted it to force the
-// evaluator to evaluate it in its entirety, rather than trying to optimize it in context.
-pragma[noinline]
-private predicate defaultNullConversion(Type fromType, Type toType) {
-  fromType instanceof NullType and convNullType(toType)
-}
-
 /**
  * INTERNAL: Do not use.
  *
@@ -596,19 +613,6 @@ private predicate convBoxingValueType(ValueType fromType, Type toType) {
   toType instanceof SystemValueTypeClass
   or
   toType = fromType.getABaseInterface+()
-}
-
-/**
- * INTERNAL: Do not use.
- *
- * Holds if there is a constant expression conversion from `fromType` to `toType`.
- *
- * 6.1.9: Implicit constant expression conversions.
- */
-predicate convConstantExpr(SignedIntegralConstantExpr e, SimpleType toType) {
-  convConstantIntExpr(e, toType)
-  or
-  convConstantLongExpr(e) and toType instanceof ULongType
 }
 
 private class SignedIntegralConstantExpr extends Expr {
