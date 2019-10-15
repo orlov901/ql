@@ -598,6 +598,18 @@ private module ImplCommon {
       exists(Node n | n.getEnclosingCallable() = callable | isUnreachableInCall(n, call))
     }
 
+    /**
+     * Gets the local call context given the call context and the callable that
+     * the contexts apply to.
+     */
+    cached
+    LocalCallContext getLocalCallContext(CallContext ctx, DataFlowCallable callable) {
+      ctx.relevantFor(callable) and
+      if relevantLocalCCtx(ctx.(CallContextSpecificCall).getCall(), callable)
+      then result.(LocalCallContextSpecificCall).getCall() = ctx.(CallContextSpecificCall).getCall()
+      else result instanceof LocalCallContextAny
+    }
+
     cached
     newtype TCallContext =
       TAnyCallContext() or
@@ -723,17 +735,6 @@ private module ImplCommon {
 
   private predicate relevantLocalCCtx(DataFlowCall call, DataFlowCallable callable) {
     exists(Node n | n.getEnclosingCallable() = callable and isUnreachableInCall(n, call))
-  }
-
-  /**
-   * Gets the local call context given the call context and the callable that
-   * the contexts apply to.
-   */
-  LocalCallContext getLocalCallContext(CallContext ctx, DataFlowCallable callable) {
-    ctx.relevantFor(callable) and
-    if relevantLocalCCtx(ctx.(CallContextSpecificCall).getCall(), callable)
-    then result.(LocalCallContextSpecificCall).getCall() = ctx.(CallContextSpecificCall).getCall()
-    else result instanceof LocalCallContextAny
   }
 
   /** A callable tagged with a relevant return kind. */
