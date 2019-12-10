@@ -601,7 +601,7 @@ private predicate parameterFlow(
       read(mid, f, node) and
       readStoreCand1(f, unbind(config)) and
       summary = midsum.readStep(f) and
-      t1 = getErasedRepr(f.getType()) and
+      t1 = f.getType() and
       t1 = t2
     )
     or
