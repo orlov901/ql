@@ -1231,6 +1231,14 @@
 | E.cs:362:18:362:29 | (...) ... | null | E.cs:362:26:362:29 | null | null |
 | E.cs:363:13:363:13 | access to local variable x | non-null | E.cs:361:17:361:32 | ... ?? ... | non-null |
 | E.cs:363:13:363:13 | access to local variable x | null | E.cs:361:17:361:32 | ... ?? ... | null |
+| E.cs:368:16:368:41 | call to method Any | true | E.cs:368:16:368:18 | access to parameter is | non-empty |
+| E.cs:373:13:373:22 | access to property HasValue | false | E.cs:373:13:373:13 | access to parameter i | null |
+| E.cs:373:13:373:22 | access to property HasValue | true | E.cs:373:13:373:13 | access to parameter i | non-null |
+| E.cs:374:20:374:45 | call to method Any | true | E.cs:374:20:374:22 | access to parameter is | non-empty |
+| E.cs:380:13:380:22 | access to property HasValue | false | E.cs:380:13:380:13 | access to parameter i | null |
+| E.cs:380:13:380:22 | access to property HasValue | true | E.cs:380:13:380:13 | access to parameter i | non-null |
+| E.cs:383:16:383:24 | call to method Any | false | E.cs:383:16:383:18 | access to parameter is | empty |
+| E.cs:383:16:383:24 | call to method Any | true | E.cs:383:16:383:18 | access to parameter is | non-empty |
 | Forwarding.cs:9:13:9:30 | !... | false | Forwarding.cs:9:14:9:30 | call to method IsNullOrEmpty | true |
 | Forwarding.cs:9:13:9:30 | !... | true | Forwarding.cs:9:14:9:30 | call to method IsNullOrEmpty | false |
 | Forwarding.cs:9:14:9:14 | access to local variable s | empty | Forwarding.cs:7:20:7:23 | null | empty |

@@ -220,6 +220,12 @@
 | E.cs:355:13:355:21 | dynamic call to operator != | false | E.cs:355:18:355:21 | null | E.cs:355:13:355:13 | access to local variable x |
 | E.cs:362:13:362:29 | ... != ... | false | E.cs:362:13:362:13 | access to local variable x | E.cs:362:18:362:29 | (...) ... |
 | E.cs:362:13:362:29 | ... != ... | false | E.cs:362:18:362:29 | (...) ... | E.cs:362:13:362:13 | access to local variable x |
+| E.cs:368:29:368:40 | ... == ... | true | E.cs:368:29:368:29 | access to parameter j | E.cs:368:34:368:40 | access to property Value |
+| E.cs:368:29:368:40 | ... == ... | true | E.cs:368:34:368:40 | access to property Value | E.cs:368:29:368:29 | access to parameter j |
+| E.cs:374:33:374:44 | ... == ... | true | E.cs:374:33:374:33 | access to parameter j | E.cs:374:38:374:44 | access to property Value |
+| E.cs:374:33:374:44 | ... == ... | true | E.cs:374:38:374:44 | access to property Value | E.cs:374:33:374:33 | access to parameter j |
+| E.cs:381:34:381:45 | ... == ... | true | E.cs:381:34:381:34 | access to parameter j | E.cs:381:39:381:45 | access to property Value |
+| E.cs:381:34:381:45 | ... == ... | true | E.cs:381:39:381:45 | access to property Value | E.cs:381:34:381:34 | access to parameter j |
 | Forwarding.cs:59:13:59:21 | ... == ... | true | Forwarding.cs:59:13:59:13 | access to parameter o | Forwarding.cs:59:18:59:21 | null |
 | Forwarding.cs:59:13:59:21 | ... == ... | true | Forwarding.cs:59:18:59:21 | null | Forwarding.cs:59:13:59:13 | access to parameter o |
 | Forwarding.cs:78:16:78:39 | call to method ReferenceEquals | true | Forwarding.cs:78:32:78:32 | access to parameter o | Forwarding.cs:78:35:78:38 | null |
