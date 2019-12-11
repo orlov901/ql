@@ -371,14 +371,14 @@ public class E
     static bool Ex35(int? i, IEnumerable<int> @is)
     {
         if (i.HasValue)
-            return @is.Any(j => j == i.Value); // GOOD (FALSE POSITIVE)
+            return @is.Any(j => j == i.Value); // GOOD
         return false;
     }
 
     static bool Ex36(int? i, IEnumerable<int> @is)
     {
         if (i.HasValue)
-            @is = @is.Where(j => j == i.Value); // BAD (always)
+            @is = @is.Where(j => j == i.Value); // BAD (always, false negative)
         i = null;
         return @is.Any();
     }
