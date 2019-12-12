@@ -921,6 +921,7 @@ module Internal {
   }
 
   /** Holds if basic block `bb` only is reached when guard `g` has abstract value `v`. */
+  cached
   private predicate guardControls(Guard g, BasicBlock bb, AbstractValue v) {
     exists(ControlFlowElement cfe, ConditionalSuccessor s, AbstractValue v0, Guard g0 |
       cfe.controlsBlock(bb, s)
