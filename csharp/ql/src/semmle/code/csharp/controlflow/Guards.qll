@@ -920,17 +920,6 @@ module Internal {
     e = any(BinaryArithmeticOperation bao | result = bao.getAnOperand())
   }
 
-  /** Holds if basic block `bb` only is reached when guard `g` has abstract value `v`. */
-  cached
-  private predicate guardControls(Guard g, BasicBlock bb, AbstractValue v) {
-    exists(ControlFlowElement cfe, ConditionalSuccessor s, AbstractValue v0, Guard g0 |
-      cfe.controlsBlock(bb, s)
-    |
-      v0.branch(cfe, s, g0) and
-      impliesSteps(g0, v0, g, v)
-    )
-  }
-
   /**
    * Holds if control flow node `cfn` only is reached when guard `g` evaluates to `v`,
    * because of an assertion.
@@ -1684,6 +1673,17 @@ module Internal {
           mc.getTarget().getAnUltimateImplementee().getSourceDeclaration() = any(SystemCollectionsGenericICollectionInterface c
             ).getAddMethod() and
           adjacentReadPairSameVarUniquePredecessor(mc.getQualifier(), e)
+        )
+      }
+
+      /** Holds if basic block `bb` only is reached when guard `g` has abstract value `v`. */
+      cached
+      predicate guardControls(Guard g, BasicBlock bb, AbstractValue v) {
+        exists(ControlFlowElement cfe, ConditionalSuccessor s, AbstractValue v0, Guard g0 |
+          cfe.controlsBlock(bb, s)
+        |
+          v0.branch(cfe, s, g0) and
+          impliesSteps(g0, v0, g, v)
         )
       }
     }
