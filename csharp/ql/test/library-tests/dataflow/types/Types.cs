@@ -85,34 +85,59 @@ class Types
     abstract class E<T>
     {
         E<T> Field;
-        public abstract void M();
+        public abstract void M1();
 
-        void M2(E<T> e)
+        public abstract void M2(E<T> e);
+
+        void M3(E<T> e)
         {
             this.Field = e;
-            this.M();
+            this.M1();
+        }
+
+        void M4(E<T> e)
+        {
+            this.Field = e;
+            this.M2(this);
         }
 
         class E1 : E<C>
         {
-            void M3()
+            void M5()
             {
-                this.M2(new E1()); // no flow
+                this.M3(new E1()); // no flow
             }
 
-            public override void M() { }
+            void M6()
+            {
+                this.M4(new E1()); // no flow
+            }
+
+            public override void M1() { }
+
+            public override void M2(E<C> e) { }
         }
 
         class E2 : E<D>
         {
-            void M3()
+            void M5()
             {
-                this.M2(new E2()); // flow
+                this.M3(new E2()); // flow
             }
 
-            public override void M()
+            void M6()
+            {
+                this.M4(new E2()); // flow
+            }
+
+            public override void M1()
             {
                 Sink(this.Field);
+            }
+
+            public override void M2(E<D> e)
+            {
+                Sink(e.Field);
             }
         }
     }
