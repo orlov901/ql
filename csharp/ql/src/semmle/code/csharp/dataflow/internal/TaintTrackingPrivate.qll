@@ -34,9 +34,6 @@ private predicate localTaintStepCil(DataFlow::Node nodeFrom, DataFlow::Node node
   asCilDataFlowNode(nodeFrom).getALocalFlowSucc(asCilDataFlowNode(nodeTo), any(CIL::Tainted t))
 }
 
-/** Gets the qualifier of element access `ea`. */
-private Expr getElementAccessQualifier(ElementAccess ea) { result = ea.getQualifier() }
-
 private class LocalTaintExprStepConfiguration extends ControlFlowReachabilityConfiguration {
   LocalTaintExprStepConfiguration() { this = "LocalTaintExprStepConfiguration" }
 
@@ -48,19 +45,6 @@ private class LocalTaintExprStepConfiguration extends ControlFlowReachabilityCon
       // Taint propagation using library code
       LocalFlow::libraryFlow(e1, e2, scope, isSuccessor, false)
       or
-      // Taint from assigned value to element qualifier (`x[i] = 0`)
-      exists(AssignExpr ae |
-        e1 = ae.getRValue() and
-        e2.(AssignableRead) = getElementAccessQualifier+(ae.getLValue()) and
-        scope = ae and
-        isSuccessor = false
-      )
-      or
-      // Taint from array initializer
-      e1 = e2.(ArrayCreation).getInitializer().getAnElement() and
-      scope = e2 and
-      isSuccessor = false
-      or
       // Taint from object initializer
       exists(ElementInitializer ei |
         ei = e2.(ObjectCreation).getInitializer().(CollectionInitializer).getAnElementInitializer() and
@@ -68,11 +52,6 @@ private class LocalTaintExprStepConfiguration extends ControlFlowReachabilityCon
         scope = e2 and
         isSuccessor = false
       )
-      or
-      // Taint from element qualifier
-      e1 = e2.(ElementAccess).getQualifier() and
-      scope = e2 and
-      isSuccessor = true
       or
       e1 = e2.(AddExpr).getAnOperand() and
       scope = e2 and
@@ -126,28 +105,6 @@ private class LocalTaintExprStepConfiguration extends ControlFlowReachabilityCon
         )
     )
   }
-
-  override predicate candidateDef(
-    Expr e, AssignableDefinition defTo, ControlFlowElement scope, boolean exactScope,
-    boolean isSuccessor
-  ) {
-    // Taint from `foreach` expression
-    exists(ForeachStmt fs |
-      e = fs.getIterableExpr() and
-      defTo.(AssignableDefinitions::LocalVariableDefinition).getDeclaration() = fs
-            .getVariableDeclExpr() and
-      isSuccessor = true
-    |
-      scope = fs and
-      exactScope = true
-      or
-      scope = fs.getIterableExpr() and
-      exactScope = false
-      or
-      scope = fs.getVariableDeclExpr() and
-      exactScope = false
-    )
-  }
 }
 
 cached
@@ -158,10 +115,6 @@ module Cached {
   predicate localAdditionalTaintStep(DataFlow::Node nodeFrom, DataFlow::Node nodeTo) {
     Stages::DataFlowStage::forceCachingInSameStage() and
     any(LocalTaintExprStepConfiguration x).hasNodePath(nodeFrom, nodeTo)
-    or
-    nodeTo = nodeFrom.(TaintedParameterNode).getUnderlyingNode()
-    or
-    nodeFrom = nodeTo.(TaintedReturnNode).getUnderlyingNode()
     or
     flowOutOfDelegateLibraryCall(nodeFrom, nodeTo, false)
     or

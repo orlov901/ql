@@ -104,6 +104,8 @@ module Gvn {
 
     ConstructedGvnType() { this = TConstructedGvnType(l) }
 
+    GvnType getArg(int i) { result = l.getArg(i) }
+
     override CompoundTypeKind getKind() { result = l.getKind() }
   }
 
@@ -572,6 +574,11 @@ module Unification {
   }
 
   private import Cached
+
+  /** Gets a type that constrains type parameter `tp`. */
+  Type getATypeParameterConstraint(TypeParameter tp) {
+    TTypeConstraint(result) = getATypeConstraint(tp)
+  }
 
   /**
    * Holds if types `t1` and `t2` are unifiable. That is, is it possible to replace

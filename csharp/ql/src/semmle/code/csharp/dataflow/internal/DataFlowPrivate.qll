@@ -15,6 +15,7 @@ private import semmle.code.csharp.dataflow.LibraryTypeDataFlow
 private import semmle.code.csharp.dispatch.Dispatch
 private import semmle.code.csharp.frameworks.EntityFramework
 private import semmle.code.csharp.frameworks.NHibernate
+private import semmle.code.csharp.frameworks.system.collections.Generic
 
 /** Calculation of the relative order in which `this` references are read. */
 private module ThisFlow {
@@ -299,7 +300,7 @@ private class Argument extends Expr {
 private predicate instanceFieldLikeAssign(Expr e, FieldLike f, Expr src, Expr q) {
   exists(FieldLikeAccess fa, AssignableDefinition def |
     def.getTargetAccess() = fa and
-    f = fa.getTarget().getSourceDeclaration() and
+    fa.getTarget().getSourceDeclaration() = f and
     not f.isStatic() and
     src = def.getSource() and
     q = fa.getQualifier() and
@@ -317,6 +318,90 @@ private predicate instanceFieldLikeInit(ObjectCreation oc, FieldLike f, Expr src
     f = mi.getInitializedMember().getSourceDeclaration() and
     not f.isStatic() and
     src = mi.getRValue()
+  )
+}
+
+private predicate instanceFieldLikeRead(FieldLikeContent flc, Expr e1, FieldLikeRead e2) {
+  flc.getField() = e2.getTarget().getSourceDeclaration() and
+  e1 = e2.getQualifier()
+}
+
+/** A collection type. */
+private class CollectionType extends Type {
+  private Type element;
+
+  CollectionType() {
+    exists(ValueOrRefType t |
+      t = this
+      or
+      t = Unification::getATypeParameterConstraint(this)
+    |
+      t.getABaseType*() = any(ConstructedType ct |
+          ct.getUnboundGeneric() instanceof SystemCollectionsGenericIEnumerableTInterface and
+          element = ct.getTypeArgument(0)
+        )
+      or
+      element = t.(ArrayType).getElementType()
+    )
+  }
+
+  /** Gets the element type of this collection type. */
+  Type getElementType() { result = element }
+}
+
+/** Holds if `e` is an expression that adds `src` to the collection  `q`. */
+private predicate elementAssign(Expr e, Expr src, Expr q) {
+  exists(AssignableDefinition def |
+    q = def.getTargetAccess().(ElementWrite).getQualifier() and
+    src = def.getSource() and
+    e = def.getExpr()
+  )
+  or
+  q.getType() instanceof CollectionType and
+  e = any(MethodCall mc |
+      mc.getQualifier() = q and
+      mc.getTarget().hasName("Add") and
+      mc.getArgument(0) = src
+    )
+}
+
+/**
+ * Holds if `e` is an an arrary/object initializer that adds `src` to the collection
+ * created of type `ct`.
+ */
+private predicate elementInit(Expr e, CollectionType ct, Expr src) {
+  e = any(ArrayCreation ac |
+      exists(ArrayInitializer ai |
+        ai = ac.getInitializer() and
+        ct = ac.getType() and
+        src = ai.getAnElement()
+      )
+    )
+  or
+  e = any(ObjectCreation oc |
+      exists(ElementInitializer ei |
+        ei = oc.getInitializer().(CollectionInitializer).getAnElementInitializer() and
+        ei.getNumberOfArguments() = 1 and
+        src = ei.getArgument(0) and
+        ct = oc.getType()
+      )
+    )
+}
+
+/** Holds if `e` is `yield return`ed into a collection of type `ct`. */
+private predicate elementYieldReturn(Expr e, CollectionType ct) {
+  exists(YieldReturnStmt yrs |
+    yrs.getExpr() = e and
+    ct = yrs.getEnclosingCallable().getReturnType()
+  )
+}
+
+private predicate elementRead(ElementContent ec, Expr e1, Expr e2) {
+  e1 = ec.getAReadExpr() and
+  (
+    e1 = e2.(ElementRead).getQualifier()
+    or
+    e2 = any(MethodCall mc | e1 = mc.getArgument(0) and mc.getTarget().hasName("First"))
   )
 }
 
@@ -356,7 +441,7 @@ private module Cached {
     TInstanceParameterNode(Callable c) { c.hasBody() and not c.(Modifiable).isStatic() } or
     TCilParameterNode(CIL::Parameter p) { p.getMethod().hasBody() } or
     TTaintedParameterNode(Parameter p) { explicitParameterNode(_, p) } or
-    TTaintedReturnNode(ControlFlow::Nodes::ElementNode cfn) {
+    TYieldReturnNode(ControlFlow::Nodes::ElementNode cfn) {
       any(Callable c).canYieldReturn(cfn.getElement())
     } or
     TImplicitCapturedArgumentNode(ControlFlow::Nodes::ElementNode cfn, LocalScopeVariable v) {
@@ -370,7 +455,11 @@ private module Cached {
       cfn.getElement() instanceof DelegateArgumentToLibraryCallable and
       any(DelegateArgumentConfiguration x).hasExprPath(_, cfn, _, call)
     } or
-    TMallocNode(ControlFlow::Nodes::ElementNode cfn) { cfn.getElement() instanceof ObjectCreation } or
+    TMallocNode(ControlFlow::Nodes::ElementNode cfn) {
+      cfn.getElement() instanceof ObjectCreation
+      or
+      cfn.getElement() instanceof ArrayCreation
+    } or
     TExprPostUpdateNode(ControlFlow::Nodes::ElementNode cfn) {
       exists(Argument a, Type t |
         a = cfn.getElement() and
@@ -383,6 +472,8 @@ private module Cached {
       )
       or
       instanceFieldLikeAssign(_, _, _, cfn.getElement())
+      or
+      elementAssign(_, _, cfn.getElement())
       or
       exists(TExprPostUpdateNode upd, FieldLikeAccess fla |
         upd = TExprPostUpdateNode(fla.getAControlFlowNode())
@@ -442,7 +533,21 @@ private module Cached {
 
   cached
   newtype TContent =
-    TFieldLikeContent(FieldLike f) { not f.isStatic() and f.getSourceDeclaration() = f }
+    TFieldLikeContent(FieldLike f) {
+      instanceFieldLikeAssign(_, f, _, _) or
+      instanceFieldLikeInit(_, f, _)
+    } or
+    TElementContent(DataFlowType collection, DataFlowType element) {
+      exists(CollectionType ct |
+        collection = Gvn::getGlobalValueNumber(ct) and
+        (
+          elementAssign(_, _, any(Expr q | q.getType() = ct)) or
+          elementInit(_, ct, _) or
+          elementYieldReturn(_, ct)
+        ) and
+        element = Gvn::getGlobalValueNumber(ct.getElementType())
+      )
+    }
 
   /**
    * Holds if data can flow from `node1` to `node2` via an assignment to
@@ -450,16 +555,28 @@ private module Cached {
    */
   cached
   predicate storeStepImpl(ExprNode node1, Content c, PostUpdateNode node2) {
-    exists(StoreStepConfiguration x, Node preNode2 |
+    exists(StoreStepConfiguration x, ExprNode preNode2 |
       preNode2 = node2.getPreUpdateNode() and
-      x.hasNodePath(node1, preNode2) and
-      instanceFieldLikeAssign(_, c.(FieldLikeContent).getField(), node1.asExpr(), preNode2.asExpr())
+      x.hasNodePath(node1, preNode2)
+    |
+      instanceFieldLikeAssign(_, c.(FieldLikeContent).getField(), node1.asExpr(), preNode2.getExpr())
+      or
+      elementAssign(_, node1.asExpr(),
+        any(Expr e | e = preNode2.getExpr() and e = c.(ElementContent).getAWriteExpr()))
     )
     or
-    exists(StoreStepConfiguration x |
-      x.hasNodePath(node1, node2) and
+    exists(StoreStepConfiguration x | x.hasNodePath(node1, node2) |
       instanceFieldLikeInit(node2.(ObjectCreationNode).getExpr(), c.(FieldLikeContent).getField(),
         node1.asExpr())
+      or
+      elementInit(node2.(CreationNode).asExpr(), c.(ElementContent).getACollectionType(),
+        node1.asExpr())
+    )
+    or
+    exists(Expr e |
+      e = node1.getExpr() and
+      elementYieldReturn(e, c.(ElementContent).getACollectionType()) and
+      node2.(YieldReturnNode).getPreUpdateNode().getExpr() = e
     )
   }
 
@@ -470,11 +587,20 @@ private module Cached {
   predicate readStepImpl(Node node1, Content c, Node node2) {
     exists(ReadStepConfiguration x |
       x.hasNodePath(node1, node2) and
-      c.(FieldLikeContent).getField() = node2
-            .asExpr()
-            .(FieldLikeRead)
-            .getTarget()
-            .getSourceDeclaration()
+      instanceFieldLikeRead(c, node1.asExpr(), node2.asExpr())
+      or
+      x.hasNodePath(node1, node2) and
+      elementRead(c, node1.asExpr(), node2.asExpr())
+      or
+      exists(ForeachStmt fs, Expr iter, Ssa::ExplicitDefinition def |
+        x
+            .hasDefPath(iter, node1.getControlFlowNode(), def.getADefinition(),
+              def.getControlFlowNode())
+      |
+        iter = fs.getIterableExpr() and
+        node2.(SsaDefinitionNode).getDefinition() = def and
+        c.(ElementContent).getAReadExpr() = iter
+      )
     )
   }
 
@@ -614,7 +740,7 @@ private module ParameterNodes {
   /**
    * A tainted parameter. Tainted parameters are a mere implementation detail, used
    * to restrict tainted flow into callables to just taint tracking (just like flow
-   * out of `TaintedReturnNode`s is restricted to taint tracking).
+   * out of `YieldReturnNode`s is restricted to taint tracking).
    */
   class TaintedParameterNode extends ParameterNode, TTaintedParameterNode {
     private Parameter parameter;
@@ -967,31 +1093,27 @@ private module ReturnNodes {
   }
 
   /**
-   * A tainted return node. Tainted return nodes are a mere implementation detail,
-   * used to restrict tainted flow out of callables to just taint tracking (just
-   * like flow in to `TaintedReturnParameter`s is restricted to taint tracking).
+   * A `yield return` node. A node is synthesized in order to be able to model
+   * `yield return`s as stores into collections, i.e., there is flow from `e`
+   * to `yield return e [e]`.
    */
-  class TaintedReturnNode extends ReturnNode, TTaintedReturnNode {
+  class YieldReturnNode extends ReturnNode, PostUpdateNode, TYieldReturnNode {
     private ControlFlow::Nodes::ElementNode cfn;
+    private YieldReturnStmt yrs;
 
-    TaintedReturnNode() { this = TTaintedReturnNode(cfn) }
+    YieldReturnNode() { this = TYieldReturnNode(cfn) and yrs.getExpr().getAControlFlowNode() = cfn }
 
-    /** Gets the underlying return node. */
-    ExprReturnNode getUnderlyingNode() { result.getControlFlowNode() = cfn }
+    override ExprReturnNode getPreUpdateNode() { result.getControlFlowNode() = cfn }
 
     override YieldReturnKind getKind() { any() }
 
-    override Callable getEnclosingCallable() {
-      result = this.getUnderlyingNode().getEnclosingCallable()
-    }
+    override Callable getEnclosingCallable() { result = yrs.getEnclosingCallable() }
 
-    override Type getType() {
-      result = this.getUnderlyingNode().getEnclosingCallable().getReturnType()
-    }
+    override Type getType() { result = yrs.getEnclosingCallable().getReturnType() }
 
-    override Location getLocation() { result = this.getUnderlyingNode().getLocation() }
+    override Location getLocation() { result = yrs.getLocation() }
 
-    override string toString() { result = this.getUnderlyingNode().toString() }
+    override string toString() { result = yrs.toString() }
   }
 
   /**
@@ -1344,6 +1466,32 @@ private class FieldLikeContent extends Content, TFieldLikeContent {
   override DataFlowType getType() { result = Gvn::getGlobalValueNumber(f.getType()) }
 }
 
+private class ElementContent extends Content, TElementContent {
+  private DataFlowType collection;
+  private DataFlowType element;
+
+  ElementContent() { this = TElementContent(collection, element) }
+
+  CollectionType getACollectionType() { Gvn::getGlobalValueNumber(result) = collection }
+
+  Expr getAWriteExpr() { result.getType() = getACollectionType() }
+
+  Expr getAReadExpr() {
+    exists(CollectionType ct |
+      ct = result.getType() and
+      compatibleTypes(Gvn::getGlobalValueNumber(ct), collection)
+    )
+  }
+
+  override string toString() { result = "[" + element + "]" }
+
+  override Location getLocation() { result instanceof EmptyLocation }
+
+  override DataFlowType getContainerType() { result = collection }
+
+  override DataFlowType getType() { result = element }
+}
+
 private class StoreStepConfiguration extends ControlFlowReachabilityConfiguration {
   StoreStepConfiguration() { this = "StoreStepConfiguration" }
 
@@ -1358,6 +1506,15 @@ private class StoreStepConfiguration extends ControlFlowReachabilityConfiguratio
     isSuccessor = false and
     instanceFieldLikeInit(e2, _, e1) and
     scope = e2
+    or
+    exactScope = false and
+    isSuccessor = false and
+    elementAssign(scope, e1, e2)
+    or
+    exactScope = false and
+    isSuccessor = false and
+    elementInit(e2, _, e1) and
+    scope = e2
   }
 }
 
@@ -1371,8 +1528,33 @@ private class ReadStepConfiguration extends ControlFlowReachabilityConfiguration
   ) {
     exactScope = false and
     isSuccessor = true and
-    e1 = e2.(FieldLikeRead).getQualifier() and
+    instanceFieldLikeRead(_, e1, e2) and
     scope = e2
+    or
+    exactScope = false and
+    isSuccessor = true and
+    elementRead(_, e1, e2)
+  }
+
+  override predicate candidateDef(
+    Expr e, AssignableDefinition defTo, ControlFlowElement scope, boolean exactScope,
+    boolean isSuccessor
+  ) {
+    exists(ForeachStmt fs |
+      e = fs.getIterableExpr() and
+      defTo.(AssignableDefinitions::LocalVariableDefinition).getDeclaration() = fs
+            .getVariableDeclExpr() and
+      isSuccessor = true
+    |
+      scope = fs and
+      exactScope = true
+      or
+      scope = fs.getIterableExpr() and
+      exactScope = false
+      or
+      scope = fs.getVariableDeclExpr() and
+      exactScope = false
+    )
   }
 }
 
@@ -1420,8 +1602,9 @@ predicate compatibleTypes(DataFlowType t1, DataFlowType t2) {
  * an update to the field.
  *
  * Nodes corresponding to AST elements, for example `ExprNode`, usually refer
- * to the value before the update with the exception of `ObjectCreation`,
- * which represents the value after the constructor has run.
+ * to the value before the update with the exception of `ObjectCreation` and
+ * `ArrayCreation`, which represent the value after the constructor or array
+ * initializer has run.
  */
 abstract class PostUpdateNode extends Node {
   /** Gets the node before the state update. */
@@ -1429,10 +1612,16 @@ abstract class PostUpdateNode extends Node {
 }
 
 private module PostUpdateNodes {
-  class ObjectCreationNode extends PostUpdateNode, ExprNode, TExprNode {
-    ObjectCreationNode() { exists(ObjectCreation oc | this = TExprNode(oc.getAControlFlowNode())) }
-
+  abstract class CreationNode extends PostUpdateNode, ExprNode, TExprNode {
     override MallocNode getPreUpdateNode() { this = TExprNode(result.getControlFlowNode()) }
+  }
+
+  class ObjectCreationNode extends CreationNode, TExprNode {
+    ObjectCreationNode() { exists(ObjectCreation oc | this = TExprNode(oc.getAControlFlowNode())) }
+  }
+
+  class ArrayCreationNode extends CreationNode, TExprNode {
+    ArrayCreationNode() { exists(ArrayCreation ac | this = TExprNode(ac.getAControlFlowNode())) }
   }
 
   private class ExprPostUpdateNode extends PostUpdateNode, TExprPostUpdateNode {

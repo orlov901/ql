@@ -561,11 +561,7 @@ class IndexerAccess extends AssignableMemberAccess, ElementAccess, IndexerAccess
  * }
  * ```
  */
-class IndexerRead extends IndexerAccess, AssignableRead {
-  override IndexerRead getANextRead() { result = AssignableRead.super.getANextRead() }
-
-  override IndexerRead getAReachableRead() { result = AssignableRead.super.getAReachableRead() }
-}
+class IndexerRead extends IndexerAccess, ElementRead { }
 
 /**
  * An access to an indexer that updates the underlying value, for example the
@@ -581,7 +577,7 @@ class IndexerRead extends IndexerAccess, AssignableRead {
  * }
  * ```
  */
-class IndexerWrite extends IndexerAccess, AssignableWrite { }
+class IndexerWrite extends IndexerAccess, ElementWrite { }
 
 /**
  * An access to a virtual indexer - an indexer that is virtual or defined in
@@ -813,7 +809,7 @@ class ArrayAccess extends ElementAccess, @array_access_expr {
  * }
  * ```
  */
-class ArrayRead extends ArrayAccess, AssignableRead { }
+class ArrayRead extends ArrayAccess, ElementRead { }
 
 /**
  * An access to an array that updates the underlying value, for example
@@ -825,7 +821,7 @@ class ArrayRead extends ArrayAccess, AssignableRead { }
  * }
  * ```
  */
-class ArrayWrite extends ArrayAccess, AssignableWrite { }
+class ArrayWrite extends ArrayAccess, ElementWrite { }
 
 /**
  * An access to a namespace, for example `System` in `nameof(System)`.

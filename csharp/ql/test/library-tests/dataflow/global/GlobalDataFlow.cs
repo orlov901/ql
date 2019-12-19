@@ -77,9 +77,9 @@ public class DataFlow
         var sink3 = "";
         ReturnRef(sink2, ref sink3, ref sink3);
         Check(sink3);
-        var sink13 = ((IEnumerable<string>)new string[] { sink3 }).SelectEven(x => x);
+        var sink13 = ((IEnumerable<string>)new string[] { sink3 }).SelectEven(x => x).First();
         Check(sink13);
-        var sink14 = ((IEnumerable<string>)new string[] { sink13.First() }).Select(ReturnCheck);
+        var sink14 = ((IEnumerable<string>)new string[] { sink13 }).Select(ReturnCheck);
         Check(sink14);
         var sink15 = ((IEnumerable<string>)new string[] { sink14.First() }).Zip(((IEnumerable<string>)new string[] { "" }), (x, y) => x);
         Check(sink15);

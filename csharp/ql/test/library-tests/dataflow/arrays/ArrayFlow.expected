@@ -1,0 +1,108 @@
+edges
+| ArrayFlow.cs:8:17:8:23 | object creation of type A : A | ArrayFlow.cs:9:27:9:27 | access to local variable a : A |
+| ArrayFlow.cs:9:19:9:29 | array creation of type A[] [[A]] : A | ArrayFlow.cs:10:14:10:16 | access to local variable as [[A]] : A |
+| ArrayFlow.cs:9:19:9:29 | array creation of type A[] [[A]] : A | ArrayFlow.cs:11:18:11:20 | access to local variable as [[A]] : A |
+| ArrayFlow.cs:9:19:9:29 | array creation of type A[] [[A]] : A | ArrayFlow.cs:12:20:12:22 | access to local variable as [[A]] : A |
+| ArrayFlow.cs:9:27:9:27 | access to local variable a : A | ArrayFlow.cs:9:19:9:29 | array creation of type A[] [[A]] : A |
+| ArrayFlow.cs:10:14:10:16 | access to local variable as [[A]] : A | ArrayFlow.cs:10:14:10:19 | access to array element |
+| ArrayFlow.cs:11:18:11:20 | access to local variable as [[A]] : A | ArrayFlow.cs:137:40:137:41 | ts [[A]] : A |
+| ArrayFlow.cs:12:20:12:22 | access to local variable as [[A]] : A | ArrayFlow.cs:12:14:12:23 | call to method First |
+| ArrayFlow.cs:26:17:26:23 | object creation of type A : A | ArrayFlow.cs:28:18:28:18 | access to local variable a : A |
+| ArrayFlow.cs:28:9:28:11 | [post] access to local variable as [[A]] : A | ArrayFlow.cs:29:14:29:16 | access to local variable as [[A]] : A |
+| ArrayFlow.cs:28:9:28:11 | [post] access to local variable as [[A]] : A | ArrayFlow.cs:30:18:30:20 | access to local variable as [[A]] : A |
+| ArrayFlow.cs:28:9:28:11 | [post] access to local variable as [[A]] : A | ArrayFlow.cs:31:20:31:22 | access to local variable as [[A]] : A |
+| ArrayFlow.cs:28:18:28:18 | access to local variable a : A | ArrayFlow.cs:28:9:28:11 | [post] access to local variable as [[A]] : A |
+| ArrayFlow.cs:29:14:29:16 | access to local variable as [[A]] : A | ArrayFlow.cs:29:14:29:19 | access to array element |
+| ArrayFlow.cs:30:18:30:20 | access to local variable as [[A]] : A | ArrayFlow.cs:137:40:137:41 | ts [[A]] : A |
+| ArrayFlow.cs:31:20:31:22 | access to local variable as [[A]] : A | ArrayFlow.cs:31:14:31:23 | call to method First |
+| ArrayFlow.cs:46:17:46:23 | object creation of type A : A | ArrayFlow.cs:48:19:48:19 | access to local variable a : A |
+| ArrayFlow.cs:48:9:48:12 | [post] access to local variable list [[A]] : A | ArrayFlow.cs:49:14:49:17 | access to local variable list [[A]] : A |
+| ArrayFlow.cs:48:9:48:12 | [post] access to local variable list [[A]] : A | ArrayFlow.cs:50:22:50:25 | access to local variable list [[A]] : A |
+| ArrayFlow.cs:48:9:48:12 | [post] access to local variable list [[A]] : A | ArrayFlow.cs:51:24:51:27 | access to local variable list [[A]] : A |
+| ArrayFlow.cs:48:19:48:19 | access to local variable a : A | ArrayFlow.cs:48:9:48:12 | [post] access to local variable list [[A]] : A |
+| ArrayFlow.cs:49:14:49:17 | access to local variable list [[A]] : A | ArrayFlow.cs:49:14:49:20 | access to indexer |
+| ArrayFlow.cs:50:22:50:25 | access to local variable list [[A]] : A | ArrayFlow.cs:139:49:139:52 | list [[A]] : A |
+| ArrayFlow.cs:51:24:51:27 | access to local variable list [[A]] : A | ArrayFlow.cs:51:14:51:28 | call to method ListFirst |
+| ArrayFlow.cs:65:17:65:23 | object creation of type A : A | ArrayFlow.cs:66:36:66:36 | access to local variable a : A |
+| ArrayFlow.cs:66:20:66:38 | object creation of type List<A> [[A]] : A | ArrayFlow.cs:67:14:67:17 | access to local variable list [[A]] : A |
+| ArrayFlow.cs:66:20:66:38 | object creation of type List<A> [[A]] : A | ArrayFlow.cs:68:22:68:25 | access to local variable list [[A]] : A |
+| ArrayFlow.cs:66:20:66:38 | object creation of type List<A> [[A]] : A | ArrayFlow.cs:69:24:69:27 | access to local variable list [[A]] : A |
+| ArrayFlow.cs:66:36:66:36 | access to local variable a : A | ArrayFlow.cs:66:20:66:38 | object creation of type List<A> [[A]] : A |
+| ArrayFlow.cs:67:14:67:17 | access to local variable list [[A]] : A | ArrayFlow.cs:67:14:67:20 | access to indexer |
+| ArrayFlow.cs:68:22:68:25 | access to local variable list [[A]] : A | ArrayFlow.cs:139:49:139:52 | list [[A]] : A |
+| ArrayFlow.cs:69:24:69:27 | access to local variable list [[A]] : A | ArrayFlow.cs:69:14:69:28 | call to method ListFirst |
+| ArrayFlow.cs:82:17:82:23 | object creation of type A : A | ArrayFlow.cs:84:18:84:18 | access to local variable a : A |
+| ArrayFlow.cs:84:9:84:12 | [post] access to local variable list [[A]] : A | ArrayFlow.cs:85:14:85:17 | access to local variable list [[A]] : A |
+| ArrayFlow.cs:84:9:84:12 | [post] access to local variable list [[A]] : A | ArrayFlow.cs:86:22:86:25 | access to local variable list [[A]] : A |
+| ArrayFlow.cs:84:9:84:12 | [post] access to local variable list [[A]] : A | ArrayFlow.cs:87:24:87:27 | access to local variable list [[A]] : A |
+| ArrayFlow.cs:84:18:84:18 | access to local variable a : A | ArrayFlow.cs:84:9:84:12 | [post] access to local variable list [[A]] : A |
+| ArrayFlow.cs:85:14:85:17 | access to local variable list [[A]] : A | ArrayFlow.cs:85:14:85:20 | access to indexer |
+| ArrayFlow.cs:86:22:86:25 | access to local variable list [[A]] : A | ArrayFlow.cs:139:49:139:52 | list [[A]] : A |
+| ArrayFlow.cs:87:24:87:27 | access to local variable list [[A]] : A | ArrayFlow.cs:87:14:87:28 | call to method ListFirst |
+| ArrayFlow.cs:137:40:137:41 | ts [[A]] : A | ArrayFlow.cs:137:52:137:53 | access to parameter ts [[A]] : A |
+| ArrayFlow.cs:137:52:137:53 | access to parameter ts [[A]] : A | ArrayFlow.cs:137:52:137:56 | access to array element |
+| ArrayFlow.cs:139:49:139:52 | list [[A]] : A | ArrayFlow.cs:139:63:139:66 | access to parameter list [[A]] : A |
+| ArrayFlow.cs:139:63:139:66 | access to parameter list [[A]] : A | ArrayFlow.cs:139:63:139:69 | access to indexer |
+nodes
+| ArrayFlow.cs:8:17:8:23 | object creation of type A : A | semmle.label | object creation of type A : A |
+| ArrayFlow.cs:9:19:9:29 | array creation of type A[] [[A]] : A | semmle.label | array creation of type A[] [[A]] : A |
+| ArrayFlow.cs:9:27:9:27 | access to local variable a : A | semmle.label | access to local variable a : A |
+| ArrayFlow.cs:10:14:10:16 | access to local variable as [[A]] : A | semmle.label | access to local variable as [[A]] : A |
+| ArrayFlow.cs:10:14:10:19 | access to array element | semmle.label | access to array element |
+| ArrayFlow.cs:11:18:11:20 | access to local variable as [[A]] : A | semmle.label | access to local variable as [[A]] : A |
+| ArrayFlow.cs:12:14:12:23 | call to method First | semmle.label | call to method First |
+| ArrayFlow.cs:12:20:12:22 | access to local variable as [[A]] : A | semmle.label | access to local variable as [[A]] : A |
+| ArrayFlow.cs:26:17:26:23 | object creation of type A : A | semmle.label | object creation of type A : A |
+| ArrayFlow.cs:28:9:28:11 | [post] access to local variable as [[A]] : A | semmle.label | [post] access to local variable as [[A]] : A |
+| ArrayFlow.cs:28:18:28:18 | access to local variable a : A | semmle.label | access to local variable a : A |
+| ArrayFlow.cs:29:14:29:16 | access to local variable as [[A]] : A | semmle.label | access to local variable as [[A]] : A |
+| ArrayFlow.cs:29:14:29:19 | access to array element | semmle.label | access to array element |
+| ArrayFlow.cs:30:18:30:20 | access to local variable as [[A]] : A | semmle.label | access to local variable as [[A]] : A |
+| ArrayFlow.cs:31:14:31:23 | call to method First | semmle.label | call to method First |
+| ArrayFlow.cs:31:20:31:22 | access to local variable as [[A]] : A | semmle.label | access to local variable as [[A]] : A |
+| ArrayFlow.cs:46:17:46:23 | object creation of type A : A | semmle.label | object creation of type A : A |
+| ArrayFlow.cs:48:9:48:12 | [post] access to local variable list [[A]] : A | semmle.label | [post] access to local variable list [[A]] : A |
+| ArrayFlow.cs:48:19:48:19 | access to local variable a : A | semmle.label | access to local variable a : A |
+| ArrayFlow.cs:49:14:49:17 | access to local variable list [[A]] : A | semmle.label | access to local variable list [[A]] : A |
+| ArrayFlow.cs:49:14:49:20 | access to indexer | semmle.label | access to indexer |
+| ArrayFlow.cs:50:22:50:25 | access to local variable list [[A]] : A | semmle.label | access to local variable list [[A]] : A |
+| ArrayFlow.cs:51:14:51:28 | call to method ListFirst | semmle.label | call to method ListFirst |
+| ArrayFlow.cs:51:24:51:27 | access to local variable list [[A]] : A | semmle.label | access to local variable list [[A]] : A |
+| ArrayFlow.cs:65:17:65:23 | object creation of type A : A | semmle.label | object creation of type A : A |
+| ArrayFlow.cs:66:20:66:38 | object creation of type List<A> [[A]] : A | semmle.label | object creation of type List<A> [[A]] : A |
+| ArrayFlow.cs:66:36:66:36 | access to local variable a : A | semmle.label | access to local variable a : A |
+| ArrayFlow.cs:67:14:67:17 | access to local variable list [[A]] : A | semmle.label | access to local variable list [[A]] : A |
+| ArrayFlow.cs:67:14:67:20 | access to indexer | semmle.label | access to indexer |
+| ArrayFlow.cs:68:22:68:25 | access to local variable list [[A]] : A | semmle.label | access to local variable list [[A]] : A |
+| ArrayFlow.cs:69:14:69:28 | call to method ListFirst | semmle.label | call to method ListFirst |
+| ArrayFlow.cs:69:24:69:27 | access to local variable list [[A]] : A | semmle.label | access to local variable list [[A]] : A |
+| ArrayFlow.cs:82:17:82:23 | object creation of type A : A | semmle.label | object creation of type A : A |
+| ArrayFlow.cs:84:9:84:12 | [post] access to local variable list [[A]] : A | semmle.label | [post] access to local variable list [[A]] : A |
+| ArrayFlow.cs:84:18:84:18 | access to local variable a : A | semmle.label | access to local variable a : A |
+| ArrayFlow.cs:85:14:85:17 | access to local variable list [[A]] : A | semmle.label | access to local variable list [[A]] : A |
+| ArrayFlow.cs:85:14:85:20 | access to indexer | semmle.label | access to indexer |
+| ArrayFlow.cs:86:22:86:25 | access to local variable list [[A]] : A | semmle.label | access to local variable list [[A]] : A |
+| ArrayFlow.cs:87:14:87:28 | call to method ListFirst | semmle.label | call to method ListFirst |
+| ArrayFlow.cs:87:24:87:27 | access to local variable list [[A]] : A | semmle.label | access to local variable list [[A]] : A |
+| ArrayFlow.cs:137:40:137:41 | ts [[A]] : A | semmle.label | ts [[A]] : A |
+| ArrayFlow.cs:137:52:137:53 | access to parameter ts [[A]] : A | semmle.label | access to parameter ts [[A]] : A |
+| ArrayFlow.cs:137:52:137:56 | access to array element | semmle.label | access to array element |
+| ArrayFlow.cs:139:49:139:52 | list [[A]] : A | semmle.label | list [[A]] : A |
+| ArrayFlow.cs:139:63:139:66 | access to parameter list [[A]] : A | semmle.label | access to parameter list [[A]] : A |
+| ArrayFlow.cs:139:63:139:69 | access to indexer | semmle.label | access to indexer |
+#select
+| ArrayFlow.cs:8:17:8:23 | object creation of type A : A | ArrayFlow.cs:8:17:8:23 | object creation of type A : A | ArrayFlow.cs:10:14:10:19 | access to array element | $@ | ArrayFlow.cs:10:14:10:19 | access to array element | access to array element |
+| ArrayFlow.cs:8:17:8:23 | object creation of type A : A | ArrayFlow.cs:8:17:8:23 | object creation of type A : A | ArrayFlow.cs:12:14:12:23 | call to method First | $@ | ArrayFlow.cs:12:14:12:23 | call to method First | call to method First |
+| ArrayFlow.cs:8:17:8:23 | object creation of type A : A | ArrayFlow.cs:8:17:8:23 | object creation of type A : A | ArrayFlow.cs:137:52:137:56 | access to array element | $@ | ArrayFlow.cs:137:52:137:56 | access to array element | access to array element |
+| ArrayFlow.cs:26:17:26:23 | object creation of type A : A | ArrayFlow.cs:26:17:26:23 | object creation of type A : A | ArrayFlow.cs:29:14:29:19 | access to array element | $@ | ArrayFlow.cs:29:14:29:19 | access to array element | access to array element |
+| ArrayFlow.cs:26:17:26:23 | object creation of type A : A | ArrayFlow.cs:26:17:26:23 | object creation of type A : A | ArrayFlow.cs:31:14:31:23 | call to method First | $@ | ArrayFlow.cs:31:14:31:23 | call to method First | call to method First |
+| ArrayFlow.cs:26:17:26:23 | object creation of type A : A | ArrayFlow.cs:26:17:26:23 | object creation of type A : A | ArrayFlow.cs:137:52:137:56 | access to array element | $@ | ArrayFlow.cs:137:52:137:56 | access to array element | access to array element |
+| ArrayFlow.cs:46:17:46:23 | object creation of type A : A | ArrayFlow.cs:46:17:46:23 | object creation of type A : A | ArrayFlow.cs:49:14:49:20 | access to indexer | $@ | ArrayFlow.cs:49:14:49:20 | access to indexer | access to indexer |
+| ArrayFlow.cs:46:17:46:23 | object creation of type A : A | ArrayFlow.cs:46:17:46:23 | object creation of type A : A | ArrayFlow.cs:51:14:51:28 | call to method ListFirst | $@ | ArrayFlow.cs:51:14:51:28 | call to method ListFirst | call to method ListFirst |
+| ArrayFlow.cs:46:17:46:23 | object creation of type A : A | ArrayFlow.cs:46:17:46:23 | object creation of type A : A | ArrayFlow.cs:139:63:139:69 | access to indexer | $@ | ArrayFlow.cs:139:63:139:69 | access to indexer | access to indexer |
+| ArrayFlow.cs:65:17:65:23 | object creation of type A : A | ArrayFlow.cs:65:17:65:23 | object creation of type A : A | ArrayFlow.cs:67:14:67:20 | access to indexer | $@ | ArrayFlow.cs:67:14:67:20 | access to indexer | access to indexer |
+| ArrayFlow.cs:65:17:65:23 | object creation of type A : A | ArrayFlow.cs:65:17:65:23 | object creation of type A : A | ArrayFlow.cs:69:14:69:28 | call to method ListFirst | $@ | ArrayFlow.cs:69:14:69:28 | call to method ListFirst | call to method ListFirst |
+| ArrayFlow.cs:65:17:65:23 | object creation of type A : A | ArrayFlow.cs:65:17:65:23 | object creation of type A : A | ArrayFlow.cs:139:63:139:69 | access to indexer | $@ | ArrayFlow.cs:139:63:139:69 | access to indexer | access to indexer |
+| ArrayFlow.cs:82:17:82:23 | object creation of type A : A | ArrayFlow.cs:82:17:82:23 | object creation of type A : A | ArrayFlow.cs:85:14:85:20 | access to indexer | $@ | ArrayFlow.cs:85:14:85:20 | access to indexer | access to indexer |
+| ArrayFlow.cs:82:17:82:23 | object creation of type A : A | ArrayFlow.cs:82:17:82:23 | object creation of type A : A | ArrayFlow.cs:87:14:87:28 | call to method ListFirst | $@ | ArrayFlow.cs:87:14:87:28 | call to method ListFirst | call to method ListFirst |
+| ArrayFlow.cs:82:17:82:23 | object creation of type A : A | ArrayFlow.cs:82:17:82:23 | object creation of type A : A | ArrayFlow.cs:139:63:139:69 | access to indexer | $@ | ArrayFlow.cs:139:63:139:69 | access to indexer | access to indexer |
