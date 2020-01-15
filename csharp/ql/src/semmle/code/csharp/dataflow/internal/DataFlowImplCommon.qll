@@ -1,14 +1,7 @@
 private import DataFlowImplSpecific::Private
-import DataFlowImplSpecific::Public
-
-private ReturnNode getAReturnNodeOfKind(ReturnKind kind) { result.getKind() = kind }
+private import DataFlowImplSpecific::Public
 
 module Public {
-  import ImplCommon
-  import FlowThrough_v2
-}
-
-private module ImplCommon {
   import Cached
 
   cached
@@ -34,68 +27,198 @@ private module ImplCommon {
       )
     }
 
-    /*
-     * The `FlowThrough_*` modules take a `step` relation as input and provide
-     * an `argumentValueFlowsThrough` relation as output.
-     *
-     * `FlowThrough_v1` includes just `simpleLocalFlowStep`, which is then used
-     * to detect getters and setters.
-     * `FlowThrough_v2` then includes a little bit of local field flow on top
-     * of `simpleLocalFlowStep`.
-     */
-
-    private module FlowThrough_v1 {
-      private predicate step = simpleLocalFlowStep/2;
-
+    private module FlowThrough {
       /**
        * Holds if `p` can flow to `node` in the same callable using only
        * value-preserving steps, not taking call contexts into account.
+       *
+       * `contentIn` describes the content of `p` that can flow to `node`
+       * (if any), and `contentOut` describes the content of `node` that
+       * it flows to (if any).
        */
-      private predicate parameterValueFlowCand(ParameterNode p, Node node) {
-        p = node
+      predicate parameterValueFlowNoCtx(
+        ParameterNode p, Node node, ContentOption contentIn, ContentOption contentOut
+      ) {
+        parameterValueFlowNoCtx0(p, node, contentIn, contentOut) and
+        (
+          // normal flow through
+          contentIn = TContentNone() and
+          contentOut = TContentNone() and
+          compatibleTypes(getErasedNodeTypeBound(p), getErasedNodeTypeBound(node))
+          or
+          // getter
+          exists(Content fIn |
+            contentIn.getContent() = fIn and
+            contentOut = TContentNone() and
+            compatibleTypes(fIn.getType(), getErasedNodeTypeBound(node))
+          )
+          or
+          // setter
+          exists(Content fOut |
+            contentIn = TContentNone() and
+            contentOut.getContent() = fOut and
+            compatibleTypes(getErasedNodeTypeBound(p), fOut.getType()) and
+            compatibleTypes(fOut.getContainerType(), getErasedNodeTypeBound(node))
+          )
+          or
+          // getter+setter
+          exists(Content fIn, Content fOut |
+            contentIn.getContent() = fIn and
+            contentOut.getContent() = fOut and
+            compatibleTypes(fIn.getType(), fOut.getType()) and
+            compatibleTypes(fOut.getContainerType(), getErasedNodeTypeBound(node))
+          )
+        )
+      }
+
+      pragma[nomagic]
+      private predicate parameterValueFlowNoCtx0(
+        ParameterNode p, Node node, ContentOption contentIn, ContentOption contentOut
+      ) {
+        p = node and
+        contentIn = TContentNone() and
+        contentOut = TContentNone()
         or
+        // local flow
         exists(Node mid |
-          parameterValueFlowCand(p, mid) and
-          step(mid, node) and
-          compatibleTypes(getErasedNodeType(p), getErasedNodeType(node))
+          parameterValueFlowNoCtx(p, mid, contentIn, contentOut) and
+          simpleLocalFlowStep(mid, node)
         )
         or
-        // flow through a callable
-        exists(Node arg |
-          parameterValueFlowCand(p, arg) and
-          argumentValueFlowsThroughCand(arg, node) and
-          compatibleTypes(getErasedNodeType(p), getErasedNodeType(node))
+        // read
+        exists(Node mid, Content f, ContentOption contentInMid, ContentOption contentOutMid |
+          parameterValueFlowNoCtx(p, mid, contentInMid, contentOutMid) and
+          readStep(mid, f, node)
+        |
+          // value neither read nor stored prior to read
+          contentInMid = TContentNone() and
+          contentOutMid = TContentNone() and
+          contentIn.getContent() = f and
+          contentOut = TContentNone()
+          or
+          // value (possibly read and then) stored prior to read (same content)
+          contentIn = contentInMid and
+          contentOutMid.getContent() = f and
+          contentOut = TContentNone()
         )
+        or
+        // store
+        exists(Node mid, Content f |
+          parameterValueFlowNoCtx(p, mid, contentIn, TContentNone()) and
+          storeStep(mid, f, node) and
+          contentOut.getContent() = f
+        )
+        or
+        // flow through: no prior read or store
+        exists(ArgumentNode arg |
+          parameterValueFlowArgNoCtx(p, arg, TContentNone(), TContentNone()) and
+          argumentValueFlowsThroughNoCtx(arg, node, contentIn, contentOut)
+        )
+        or
+        // flow through: no read or store inside method
+        exists(ArgumentNode arg |
+          parameterValueFlowArgNoCtx(p, arg, contentIn, contentOut) and
+          argumentValueFlowsThroughNoCtx(arg, node, TContentNone(), TContentNone())
+        )
+        or
+        // flow through: prior read (but no store); in this case the flow-through
+        // method is not allowed to read, but is allowed to store
+        exists(ArgumentNode arg |
+          parameterValueFlowArgNoCtx(p, arg, contentIn, TContentNone()) and
+          argumentValueFlowsThroughNoCtx(arg, node, TContentNone(), contentOut) and
+          contentIn.hasContent()
+        )
+        or
+        // flow through: possible prior read and definite prior store; in this case
+        // the flow-through method is allowed to read same content back out
+        exists(ArgumentNode arg, ContentOption contentOutBefore |
+          parameterValueFlowArgNoCtx(p, arg, contentIn, contentOutBefore) and
+          argumentValueFlowsThroughNoCtx(arg, node, TContentSome(contentOutBefore.getContent()),
+            contentOut)
+        )
+      }
+
+      pragma[noinline]
+      private predicate parameterValueFlowArgNoCtx(
+        ParameterNode p, ArgumentNode arg, ContentOption contentIn, ContentOption contentOut
+      ) {
+        parameterValueFlowNoCtx(p, arg, contentIn, contentOut) and
+        argumentValueFlowsThroughNoCtx(arg, _, _, _)
+      }
+
+      pragma[noinline]
+      private predicate parameterValueFlowsToPreUpdateNoCtx(ParameterNode p, PostUpdateNode n) {
+        parameterValueFlowNoCtx(p, n.getPreUpdateNode(), TContentNone(), TContentNone())
+      }
+
+      pragma[noinline]
+      private predicate parameterValueFlowsToPostUpdateNoCtx(
+        ParameterNode p, PostUpdateNode n, ContentOption contentIn, ContentOption contentOut
+      ) {
+        parameterValueFlowNoCtx(p, n, contentIn, contentOut) and
+        contentOut.hasContent()
       }
 
       /**
        * Holds if `p` can flow to a return node of kind `kind` in the same
        * callable using only value-preserving steps, not taking call contexts
        * into account.
+       *
+       * `contentIn` describes the content of `p` that can flow to the return
+       * node (if any), and `contentOut` describes the content of the return
+       * node that it flows to (if any).
        */
-      private predicate parameterValueFlowsThroughCand(ParameterNode p, ReturnKind kind) {
-        parameterValueFlowCand(p, getAReturnNodeOfKind(kind))
+      private predicate parameterValueFlowsThroughNoCtx(
+        ParameterNode p, ReturnKindExt kind, ContentOption contentIn, ContentOption contentOut
+      ) {
+        exists(ReturnNode ret |
+          parameterValueFlowNoCtx(p, ret, contentIn, contentOut) and
+          kind = TValueReturn(ret.getKind())
+        )
+        or
+        exists(ParameterNode p2, int pos2, PostUpdateNode n |
+          parameterValueFlowsToPostUpdateNoCtx(p, n, contentIn, contentOut) and
+          parameterValueFlowsToPreUpdateNoCtx(p2, n) and
+          p2.isParameterOf(_, pos2) and
+          kind = TParamUpdate(pos2)
+        )
       }
 
       pragma[nomagic]
-      private predicate argumentValueFlowsThroughCand0(
-        DataFlowCall call, ArgumentNode arg, ReturnKind kind
+      private predicate argumentValueFlowsThroughNoCtx0(
+        DataFlowCall call, ArgumentNode arg, ReturnKindExt kind, ContentOption contentIn,
+        ContentOption contentOut
       ) {
         exists(ParameterNode param | viableParamArg(call, param, arg) |
-          parameterValueFlowsThroughCand(param, kind)
+          parameterValueFlowsThroughNoCtx(param, kind, contentIn, contentOut)
         )
       }
 
       /**
        * Holds if `arg` flows to `out` through a call using only value-preserving steps,
        * not taking call contexts into account.
+       *
+       * `contentIn` describes the content of `arg` that can flow to `out` (if any), and
+       * `contentOut` describes the content of `out` that it flows to (if any).
        */
-      private predicate argumentValueFlowsThroughCand(ArgumentNode arg, OutNode out) {
-        exists(DataFlowCall call, ReturnKind kind |
-          argumentValueFlowsThroughCand0(call, arg, kind)
+      private predicate argumentValueFlowsThroughNoCtx(
+        ArgumentNode arg, Node out, ContentOption contentIn, ContentOption contentOut
+      ) {
+        exists(DataFlowCall call, ReturnKindExt kind |
+          argumentValueFlowsThroughNoCtx0(call, arg, kind, contentIn, contentOut) and
+          out = kind.getAnOutNode(call)
         |
-          out = getAnOutNode(call, kind) and
-          compatibleTypes(getErasedNodeType(arg), getErasedNodeType(out))
+          contentIn.hasContent()
+          or
+          contentIn = TContentNone() and
+          contentOut = TContentNone() and
+          compatibleTypes(getErasedNodeTypeBound(arg), getErasedNodeTypeBound(out))
+          or
+          exists(Content fOut |
+            contentIn = TContentNone() and
+            contentOut.getContent() = fOut and
+            compatibleTypes(getErasedNodeTypeBound(arg), fOut.getType())
+          )
         )
       }
 
@@ -104,19 +227,19 @@ private module ImplCommon {
        * `enclosing`, and `arg` may flow through `call`.
        */
       pragma[noinline]
-      private predicate argumentOf(
+      private predicate argumentOfNoCtx(
         DataFlowCall call, int i, ArgumentNode arg, DataFlowCallable enclosing
       ) {
         arg.argumentOf(call, i) and
-        argumentValueFlowsThroughCand(arg, _) and
+        argumentValueFlowsThroughNoCtx(arg, _, _, _) and
         enclosing = arg.getEnclosingCallable()
       }
 
       pragma[noinline]
-      private predicate viableParamArg0(
+      private predicate viableParamArgNoCtx0(
         int i, ArgumentNode arg, CallContext outercc, DataFlowCall call
       ) {
-        exists(DataFlowCallable c | argumentOf(call, i, arg, c) |
+        exists(DataFlowCallable c | argumentOfNoCtx(call, i, arg, c) |
           (
             outercc = TAnyCallContext()
             or
@@ -131,11 +254,11 @@ private module ImplCommon {
       }
 
       pragma[noinline]
-      private predicate viableParamArg1(
+      private predicate viableParamArgNoCtx1(
         ParameterNode p, DataFlowCallable callable, int i, ArgumentNode arg, CallContext outercc,
         DataFlowCall call
       ) {
-        viableParamArg0(i, arg, outercc, call) and
+        viableParamArgNoCtx0(i, arg, outercc, call) and
         callable = resolveCall(call, outercc) and
         p.isParameterOf(callable, any(int j | j <= i and j >= i))
       }
@@ -145,12 +268,12 @@ private module ImplCommon {
        * `arg` may flow through `call`. The possible contexts before and after
        * entering the callable are `outercc` and `innercc`, respectively.
        */
-      private predicate viableParamArg(
+      private predicate viableParamArgNoCtx(
         DataFlowCall call, ParameterNode p, ArgumentNode arg, CallContext outercc,
         CallContextCall innercc
       ) {
         exists(int i, DataFlowCallable callable |
-          viableParamArg1(p, callable, i, arg, outercc, call)
+          viableParamArgNoCtx1(p, callable, i, arg, outercc, call)
         |
           if recordDataFlowCallSite(call, callable)
           then innercc = TSpecificCall(call)
@@ -171,94 +294,250 @@ private module ImplCommon {
       /**
        * Holds if `p` can flow to `node` in the same callable using only
        * value-preserving steps, in call context `cc`.
+       *
+       * `contentIn` describes the content of `p` that can flow to `node`
+       * (if any), and `contentOut` describes the content of `node` that
+       * it flows to (if any).
+       *
+       * This predicate is further restricted to parameters `p` that can either
+       * flow through without taking call contexts into account, or that can
+       * flow to a post-update node through which another parameter can flow
+       * (again without taking call contexts into account).
        */
-      private predicate parameterValueFlow(ParameterNode p, Node node, CallContextCall cc) {
+      private predicate parameterValueFlow(
+        ParameterNode p, Node node, ContentOption contentIn, ContentOption contentOut,
+        CallContextCall cc
+      ) {
+        parameterValueFlow0(p, node, contentIn, contentOut, cc) and
+        (
+          // normal flow through
+          contentIn = TContentNone() and
+          contentOut = TContentNone() and
+          compatibleTypes(getErasedNodeTypeBound(p), getErasedNodeTypeBound(node))
+          or
+          // getter
+          exists(Content fIn |
+            contentIn.getContent() = fIn and
+            contentOut = TContentNone() and
+            compatibleTypes(fIn.getType(), getErasedNodeTypeBound(node))
+          )
+          or
+          // setter
+          exists(Content fOut |
+            contentIn = TContentNone() and
+            contentOut.getContent() = fOut and
+            compatibleTypes(getErasedNodeTypeBound(p), fOut.getType()) and
+            compatibleTypes(fOut.getContainerType(), getErasedNodeTypeBound(node))
+          )
+          or
+          // getter+setter
+          exists(Content fIn, Content fOut |
+            contentIn.getContent() = fIn and
+            contentOut.getContent() = fOut and
+            compatibleTypes(fIn.getType(), fOut.getType()) and
+            compatibleTypes(fOut.getContainerType(), getErasedNodeTypeBound(node))
+          )
+        )
+      }
+
+      pragma[nomagic]
+      private predicate parameterValueFlow0(
+        ParameterNode p, Node node, ContentOption contentIn, ContentOption contentOut,
+        CallContextCall cc
+      ) {
         p = node and
-        parameterValueFlowsThroughCand(p, _) and
+        (
+          parameterValueFlowsThroughNoCtx(p, _, _, _)
+          or
+          exists(DataFlowCallable c, ParameterNode other, int pos |
+            parameterValueFlowsThroughNoCtx(other, TParamUpdate(pos), _, _) and
+            other.isParameterOf(c, _) and
+            p.isParameterOf(c, pos)
+          )
+        ) and
+        contentIn = TContentNone() and
+        contentOut = TContentNone() and
         cc = getAValidCallContextForParameter(p)
         or
+        // local flow
         exists(Node mid |
-          parameterValueFlow(p, mid, cc) and
-          step(mid, node) and
-          compatibleTypes(getErasedNodeType(p), getErasedNodeType(node)) and
+          parameterValueFlow(p, mid, contentIn, contentOut, cc) and
+          simpleLocalFlowStep(mid, node) and
           not isUnreachableInCall(node, cc.(CallContextSpecificCall).getCall())
         )
         or
-        // flow through a callable
-        exists(Node arg |
-          parameterValueFlow(p, arg, cc) and
-          argumentValueFlowsThrough(arg, node, cc) and
-          compatibleTypes(getErasedNodeType(p), getErasedNodeType(node)) and
+        // read
+        exists(Node mid, Content f, ContentOption contentInMid, ContentOption contentOutMid |
+          parameterValueFlow(p, mid, contentInMid, contentOutMid, cc) and
+          readStep(mid, f, node) and
           not isUnreachableInCall(node, cc.(CallContextSpecificCall).getCall())
+        |
+          // value neither read nor stored prior to read
+          contentInMid = TContentNone() and
+          contentOutMid = TContentNone() and
+          contentIn.getContent() = f and
+          contentOut = TContentNone()
+          or
+          // value (possibly read and then) stored prior to read (same content)
+          contentIn = contentInMid and
+          contentOutMid.getContent() = f and
+          contentOut = TContentNone()
         )
+        or
+        // store
+        exists(Node mid, Content f |
+          parameterValueFlow(p, mid, contentIn, TContentNone(), cc) and
+          storeStep(mid, f, node) and
+          contentOut.getContent() = f
+        )
+        or
+        // flow through: no prior read or store
+        exists(ArgumentNode arg |
+          parameterValueFlowArg(p, arg, TContentNone(), TContentNone(), cc) and
+          argumentValueFlowsThrough(_, arg, node, contentIn, contentOut, cc)
+        )
+        or
+        // flow through: no read or store inside method
+        exists(ArgumentNode arg |
+          parameterValueFlowArg(p, arg, contentIn, contentOut, cc) and
+          argumentValueFlowsThrough(_, arg, node, TContentNone(), TContentNone(), cc)
+        )
+        or
+        // flow through: prior read (but no store); in this case the flow-through
+        // method is not allowed to read, but is allowed to store
+        exists(ArgumentNode arg |
+          parameterValueFlowArg(p, arg, contentIn, TContentNone(), cc) and
+          argumentValueFlowsThrough(_, arg, node, TContentNone(), contentOut, cc) and
+          contentIn.hasContent()
+        )
+        or
+        // flow through: possible prior read and definite prior store; in this case
+        // the flow-through method is allowed to read same content back out
+        exists(ArgumentNode arg, ContentOption contentOutBefore |
+          parameterValueFlowArg(p, arg, contentIn, contentOutBefore, cc) and
+          argumentValueFlowsThrough(_, arg, node, TContentSome(contentOutBefore.getContent()),
+            contentOut, cc)
+        )
+      }
+
+      pragma[noinline]
+      private predicate parameterValueFlowArg(
+        ParameterNode p, ArgumentNode arg, ContentOption contentIn, ContentOption contentOut,
+        CallContextCall cc
+      ) {
+        parameterValueFlow(p, arg, contentIn, contentOut, cc) and
+        argumentValueFlowsThroughNoCtx(arg, _, _, _)
+      }
+
+      pragma[noinline]
+      private predicate parameterValueFlowsToPreUpdate(
+        ParameterNode p, PostUpdateNode n, CallContext cc
+      ) {
+        parameterValueFlow(p, n.getPreUpdateNode(), TContentNone(), TContentNone(), cc)
+      }
+
+      pragma[noinline]
+      private predicate parameterValueFlowsToPostUpdate(
+        ParameterNode p, PostUpdateNode n, ContentOption contentIn, ContentOption contentOut,
+        CallContext cc
+      ) {
+        parameterValueFlow(p, n, contentIn, contentOut, cc) and
+        contentOut.hasContent()
       }
 
       /**
        * Holds if `p` can flow to a return node of kind `kind` in the same
        * callable using only value-preserving steps, in call context `cc`.
+       *
+       * `contentIn` describes the content of `p` that can flow to the return
+       * node (if any), and `contentOut` describes the content of the return
+       * node that it flows to (if any).
        */
-      private predicate parameterValueFlowsThrough(
-        ParameterNode p, ReturnKind kind, CallContextCall cc
+      predicate parameterValueFlowsThrough(
+        ParameterNode p, ReturnKindExt kind, ContentOption contentIn, ContentOption contentOut,
+        CallContextCall cc
       ) {
-        parameterValueFlow(p, getAReturnNodeOfKind(kind), cc)
+        exists(ReturnNode ret |
+          parameterValueFlow(p, ret, contentIn, contentOut, cc) and
+          kind = TValueReturn(ret.getKind())
+        )
+        or
+        exists(ParameterNode p2, int pos2, PostUpdateNode n |
+          parameterValueFlowsToPostUpdate(p, n, contentIn, contentOut, cc) and
+          parameterValueFlowsToPreUpdate(p2, n, cc) and
+          p2.isParameterOf(_, pos2) and
+          kind = TParamUpdate(pos2)
+        )
       }
 
       pragma[nomagic]
       private predicate argumentValueFlowsThrough0(
-        DataFlowCall call, ArgumentNode arg, ReturnKind kind, CallContext cc
+        DataFlowCall call, ArgumentNode arg, ReturnKindExt kind, ContentOption contentIn,
+        ContentOption contentOut, CallContext cc
       ) {
         exists(ParameterNode param, CallContext innercc |
-          viableParamArg(call, param, arg, cc, innercc) and
-          parameterValueFlowsThrough(param, kind, innercc)
+          viableParamArgNoCtx(call, param, arg, cc, innercc) and
+          parameterValueFlowsThrough(param, kind, contentIn, contentOut, innercc)
         )
       }
 
       /**
        * Holds if `arg` flows to `out` through a call using only value-preserving steps,
        * in call context cc.
+       *
+       * `contentIn` describes the content of `arg` that can flow to `out` (if any), and
+       * `contentOut` describes the content of `out` that it flows to (if any).
        */
-      predicate argumentValueFlowsThrough(ArgumentNode arg, OutNode out, CallContext cc) {
-        exists(DataFlowCall call, ReturnKind kind |
-          argumentValueFlowsThrough0(call, arg, kind, cc)
+      predicate argumentValueFlowsThrough(
+        DataFlowCall call, ArgumentNode arg, Node out, ContentOption contentIn,
+        ContentOption contentOut, CallContext cc
+      ) {
+        exists(ReturnKindExt kind |
+          argumentValueFlowsThrough0(call, arg, kind, contentIn, contentOut, cc) and
+          out = kind.getAnOutNode(call) and
+          not isUnreachableInCall(out, cc.(CallContextSpecificCall).getCall())
         |
-          out = getAnOutNode(call, kind) and
-          not isUnreachableInCall(out, cc.(CallContextSpecificCall).getCall()) and
-          compatibleTypes(getErasedNodeType(arg), getErasedNodeType(out))
+          contentIn.hasContent()
+          or
+          contentIn = TContentNone() and
+          contentOut = TContentNone() and
+          compatibleTypes(getErasedNodeTypeBound(arg), getErasedNodeTypeBound(out))
+          or
+          exists(Content fOut |
+            contentIn = TContentNone() and
+            contentOut.getContent() = fOut and
+            compatibleTypes(getErasedNodeTypeBound(arg), fOut.getType())
+          )
         )
       }
     }
 
     /**
-     * Holds if `p` can flow to the pre-update node of `n` in the same callable
-     * using only value-preserving steps.
+     * Holds if `p` can flow to the pre-update node associated with post-update
+     * node `n`, in the same callable, using only value-preserving steps.
      */
     cached
-    predicate parameterValueFlowsToUpdate(ParameterNode p, PostUpdateNode n) {
-      parameterValueFlowNoCtx(p, n.getPreUpdateNode())
+    predicate parameterValueFlowsToPreUpdate(ParameterNode p, PostUpdateNode n) {
+      FlowThrough::parameterValueFlowNoCtx(p, n.getPreUpdateNode(), TContentNone(), TContentNone())
     }
 
     /**
-     * Holds if data can flow from `node1` to `node2` in one local step or a step
-     * through a value-preserving method.
+     * Holds if `p` can flow to a return node of kind `kind` in the same
+     * callable using only value-preserving steps, in call context `cc`.
      */
-    private predicate localValueStep(Node node1, Node node2) {
-      simpleLocalFlowStep(node1, node2) or
-      FlowThrough_v1::argumentValueFlowsThrough(node1, node2, _)
+    cached
+    predicate parameterValueFlowsThrough(ParameterNode p, ReturnKindExt kind, CallContextCall cc) {
+      FlowThrough::parameterValueFlowsThrough(p, kind, TContentNone(), TContentNone(), cc)
     }
 
     /**
-     * Holds if `p` can flow to `node` in the same callable allowing local flow
-     * steps and value flow through methods. Call contexts are only accounted
-     * for in the nested calls.
+     * Holds if `arg` flows to `out` through a call using only value-preserving steps,
+     * in call context cc.
      */
-    private predicate parameterValueFlowNoCtx(ParameterNode p, Node node) {
-      p = node
-      or
-      exists(Node mid |
-        parameterValueFlowNoCtx(p, mid) and
-        localValueStep(mid, node) and
-        compatibleTypes(getErasedNodeType(p), getErasedNodeType(node))
-      )
+    cached
+    predicate argumentValueFlowsThrough(NodeExt arg, NodeExt out, CallContext cc) {
+      FlowThrough::argumentValueFlowsThrough(_, arg.getNode(), out.getNode(), TContentNone(),
+        TContentNone(), cc)
     }
 
     /*
@@ -271,8 +550,7 @@ private module ImplCommon {
      *   stored.
      * - A reverse step through a read when the result of the read has been
      *   stored into. This handles cases like `x.f1.f2 = y`.
-     * `storeViaSideEffect` covers the first two cases, and `storeReturn` covers
-     * the third case.
+     * `argumentValueFlowsThrough` covers the second and third case.
      */
 
     /**
@@ -280,75 +558,16 @@ private module ImplCommon {
      * `f` or via a call that acts as a setter.
      */
     cached
-    predicate store(Node node1, Content f, Node node2) {
-      storeViaSideEffect(node1, f, node2) or
-      storeReturn(node1, f, node2) or
-      read(node2.(PostUpdateNode).getPreUpdateNode(), f, node1.(PostUpdateNode).getPreUpdateNode())
-    }
-
-    private predicate storeViaSideEffect(Node node1, Content f, PostUpdateNode node2) {
-      storeStep(node1, f, node2) and readStep(_, f, _)
+    predicate store(NodeExt node1, Content f, NodeExt node2) {
+      storeStep(node1.getNode(), f, node2.getNode()) and readStep(_, f, _)
       or
-      exists(DataFlowCall call, int i1, int i2 |
-        setterCall(call, i1, i2, f) and
-        node1.(ArgumentNode).argumentOf(call, i1) and
-        node2.getPreUpdateNode().(ArgumentNode).argumentOf(call, i2) and
-        compatibleTypes(getErasedNodeTypeBound(node1), f.getType()) and
-        compatibleTypes(getErasedNodeTypeBound(node2), f.getContainerType())
-      )
-    }
-
-    pragma[nomagic]
-    private predicate setterInParam(ParameterNode p1, Content f, ParameterNode p2) {
-      exists(Node n1, PostUpdateNode n2 |
-        parameterValueFlowNoCtx(p1, n1) and
-        storeViaSideEffect(n1, f, n2) and
-        parameterValueFlowNoCtx(p2, n2.getPreUpdateNode()) and
-        p1 != p2
-      )
-    }
-
-    pragma[nomagic]
-    private predicate setterCall(DataFlowCall call, int i1, int i2, Content f) {
-      exists(DataFlowCallable callable, ParameterNode p1, ParameterNode p2 |
-        setterInParam(p1, f, p2) and
-        callable = viableCallable(call) and
-        p1.isParameterOf(callable, i1) and
-        p2.isParameterOf(callable, i2)
-      )
-    }
-
-    pragma[noinline]
-    private predicate storeReturn0(DataFlowCall call, ReturnKind kind, ArgumentNode arg, Content f) {
-      exists(ParameterNode p |
-        viableParamArg(call, p, arg) and
-        setterReturn(p, f, kind)
-      )
-    }
-
-    private predicate storeReturn(Node node1, Content f, Node node2) {
-      exists(DataFlowCall call, ReturnKind kind |
-        storeReturn0(call, kind, node1, f) and
-        node2 = getAnOutNode(call, kind) and
-        compatibleTypes(getErasedNodeTypeBound(node1), f.getType()) and
-        compatibleTypes(getErasedNodeTypeBound(node2), f.getContainerType())
-      )
-    }
-
-    private predicate setterReturn(ParameterNode p, Content f, ReturnKind kind) {
-      exists(Node n1, Node n2 |
-        parameterValueFlowNoCtx(p, n1) and
-        store(n1, f, n2) and
-        localValueStep*(n2, getAReturnNodeOfKind(kind))
-      )
-    }
-
-    pragma[noinline]
-    private predicate read0(DataFlowCall call, ReturnKind kind, ArgumentNode arg, Content f) {
-      exists(ParameterNode p |
-        viableParamArg(call, p, arg) and
-        getter(p, f, kind)
-      )
+      FlowThrough::argumentValueFlowsThrough(_, node1.getNode(), node2.getNode(), TContentNone(),
+        TContentSome(f), _)
+      or
+      read(TNormalNode(node2.getNode().(PostUpdateNode).getPreUpdateNode()), f,
+        TNormalNode(node1.getNode().(PostUpdateNode).getPreUpdateNode()))
+      or
+      node1 = TReadStoreNode(_, _, node2.getNode(), _, f)
     }
 
     /**
@@ -356,221 +575,13 @@ private module ImplCommon {
      * via a getter.
      */
     cached
-    predicate read(Node node1, Content f, Node node2) {
-      readStep(node1, f, node2)
+    predicate read(NodeExt node1, Content f, NodeExt node2) {
+      readStep(node1.getNode(), f, node2.getNode())
       or
-      exists(DataFlowCall call, ReturnKind kind |
-        read0(call, kind, node1, f) and
-        node2 = getAnOutNode(call, kind) and
-        compatibleTypes(getErasedNodeTypeBound(node1), f.getContainerType()) and
-        compatibleTypes(getErasedNodeTypeBound(node2), f.getType())
-      )
-    }
-
-    private predicate getter(ParameterNode p, Content f, ReturnKind kind) {
-      exists(Node n1, Node n2 |
-        parameterValueFlowNoCtx(p, n1) and
-        read(n1, f, n2) and
-        localValueStep*(n2, getAReturnNodeOfKind(kind))
-      )
-    }
-
-    cached
-    predicate localStoreReadStep(Node node1, Node node2) {
-      exists(Node mid1, Node mid2, Content f |
-        store(node1, f, mid1) and
-        localValueStep*(mid1, mid2) and
-        read(mid2, f, node2) and
-        compatibleTypes(getErasedNodeTypeBound(node1), getErasedNodeTypeBound(node2))
-      )
-    }
-
-    cached
-    module FlowThrough_v2 {
-      private predicate step(Node node1, Node node2) {
-        simpleLocalFlowStep(node1, node2) or
-        localStoreReadStep(node1, node2)
-      }
-
-      /**
-       * Holds if `p` can flow to `node` in the same callable using only
-       * value-preserving steps, not taking call contexts into account.
-       */
-      private predicate parameterValueFlowCand(ParameterNode p, Node node) {
-        p = node
-        or
-        exists(Node mid |
-          parameterValueFlowCand(p, mid) and
-          step(mid, node) and
-          compatibleTypes(getErasedNodeType(p), getErasedNodeType(node))
-        )
-        or
-        // flow through a callable
-        exists(Node arg |
-          parameterValueFlowCand(p, arg) and
-          argumentValueFlowsThroughCand(arg, node) and
-          compatibleTypes(getErasedNodeType(p), getErasedNodeType(node))
-        )
-      }
-
-      /**
-       * Holds if `p` can flow to a return node of kind `kind` in the same
-       * callable using only value-preserving steps, not taking call contexts
-       * into account.
-       */
-      private predicate parameterValueFlowsThroughCand(ParameterNode p, ReturnKind kind) {
-        parameterValueFlowCand(p, getAReturnNodeOfKind(kind))
-      }
-
-      pragma[nomagic]
-      private predicate argumentValueFlowsThroughCand0(
-        DataFlowCall call, ArgumentNode arg, ReturnKind kind
-      ) {
-        exists(ParameterNode param | viableParamArg(call, param, arg) |
-          parameterValueFlowsThroughCand(param, kind)
-        )
-      }
-
-      /**
-       * Holds if `arg` flows to `out` through a call using only value-preserving steps,
-       * not taking call contexts into account.
-       */
-      private predicate argumentValueFlowsThroughCand(ArgumentNode arg, OutNode out) {
-        exists(DataFlowCall call, ReturnKind kind |
-          argumentValueFlowsThroughCand0(call, arg, kind)
-        |
-          out = getAnOutNode(call, kind) and
-          compatibleTypes(getErasedNodeType(arg), getErasedNodeType(out))
-        )
-      }
-
-      /**
-       * Holds if `arg` is the `i`th argument of `call` inside the callable
-       * `enclosing`, and `arg` may flow through `call`.
-       */
-      pragma[noinline]
-      private predicate argumentOf(
-        DataFlowCall call, int i, ArgumentNode arg, DataFlowCallable enclosing
-      ) {
-        arg.argumentOf(call, i) and
-        argumentValueFlowsThroughCand(arg, _) and
-        enclosing = arg.getEnclosingCallable()
-      }
-
-      pragma[noinline]
-      private predicate viableParamArg0(
-        int i, ArgumentNode arg, CallContext outercc, DataFlowCall call
-      ) {
-        exists(DataFlowCallable c | argumentOf(call, i, arg, c) |
-          (
-            outercc = TAnyCallContext()
-            or
-            outercc = TSomeCall()
-            or
-            exists(DataFlowCall other | outercc = TSpecificCall(other) |
-              recordDataFlowCallSite(other, c)
-            )
-          ) and
-          not isUnreachableInCall(arg, outercc.(CallContextSpecificCall).getCall())
-        )
-      }
-
-      pragma[noinline]
-      private predicate viableParamArg1(
-        ParameterNode p, DataFlowCallable callable, int i, ArgumentNode arg, CallContext outercc,
-        DataFlowCall call
-      ) {
-        viableParamArg0(i, arg, outercc, call) and
-        callable = resolveCall(call, outercc) and
-        p.isParameterOf(callable, any(int j | j <= i and j >= i))
-      }
-
-      /**
-       * Holds if `arg` is a possible argument to `p`, in the call `call`, and
-       * `arg` may flow through `call`. The possible contexts before and after
-       * entering the callable are `outercc` and `innercc`, respectively.
-       */
-      private predicate viableParamArg(
-        DataFlowCall call, ParameterNode p, ArgumentNode arg, CallContext outercc,
-        CallContextCall innercc
-      ) {
-        exists(int i, DataFlowCallable callable |
-          viableParamArg1(p, callable, i, arg, outercc, call)
-        |
-          if recordDataFlowCallSite(call, callable)
-          then innercc = TSpecificCall(call)
-          else innercc = TSomeCall()
-        )
-      }
-
-      private CallContextCall getAValidCallContextForParameter(ParameterNode p) {
-        result = TSomeCall()
-        or
-        exists(DataFlowCall call, DataFlowCallable callable |
-          result = TSpecificCall(call) and
-          p.isParameterOf(callable, _) and
-          recordDataFlowCallSite(call, callable)
-        )
-      }
-
-      /**
-       * Holds if `p` can flow to `node` in the same callable using only
-       * value-preserving steps, in call context `cc`.
-       */
-      private predicate parameterValueFlow(ParameterNode p, Node node, CallContextCall cc) {
-        p = node and
-        parameterValueFlowsThroughCand(p, _) and
-        cc = getAValidCallContextForParameter(p)
-        or
-        exists(Node mid |
-          parameterValueFlow(p, mid, cc) and
-          step(mid, node) and
-          compatibleTypes(getErasedNodeType(p), getErasedNodeType(node)) and
-          not isUnreachableInCall(node, cc.(CallContextSpecificCall).getCall())
-        )
-        or
-        // flow through a callable
-        exists(Node arg |
-          parameterValueFlow(p, arg, cc) and
-          argumentValueFlowsThrough(arg, node, cc) and
-          compatibleTypes(getErasedNodeType(p), getErasedNodeType(node)) and
-          not isUnreachableInCall(node, cc.(CallContextSpecificCall).getCall())
-        )
-      }
-
-      /**
-       * Holds if `p` can flow to a return node of kind `kind` in the same
-       * callable using only value-preserving steps, in call context `cc`.
-       */
-      cached
-      predicate parameterValueFlowsThrough(ParameterNode p, ReturnKind kind, CallContextCall cc) {
-        parameterValueFlow(p, getAReturnNodeOfKind(kind), cc)
-      }
-
-      pragma[nomagic]
-      private predicate argumentValueFlowsThrough0(
-        DataFlowCall call, ArgumentNode arg, ReturnKind kind, CallContext cc
-      ) {
-        exists(ParameterNode param, CallContext innercc |
-          viableParamArg(call, param, arg, cc, innercc) and
-          parameterValueFlowsThrough(param, kind, innercc)
-        )
-      }
-
-      /**
-       * Holds if `arg` flows to `out` through a call using only value-preserving steps,
-       * in call context cc.
-       */
-      cached
-      predicate argumentValueFlowsThrough(ArgumentNode arg, OutNode out, CallContext cc) {
-        exists(DataFlowCall call, ReturnKind kind |
-          argumentValueFlowsThrough0(call, arg, kind, cc)
-        |
-          out = getAnOutNode(call, kind) and
-          not isUnreachableInCall(out, cc.(CallContextSpecificCall).getCall()) and
-          compatibleTypes(getErasedNodeType(arg), getErasedNodeType(out))
-        )
-      }
+      FlowThrough::argumentValueFlowsThrough(_, node1.getNode(), node2.getNode(), TContentSome(f),
+        TContentNone(), _)
+      or
+      node2 = TReadStoreNode(_, node1.getNode(), _, f, _)
     }
 
     /**
@@ -593,18 +604,130 @@ private module ImplCommon {
 
     cached
     newtype TReturnPosition =
-      TReturnPosition0(DataFlowCallable c, ReturnKindExt kind) { returnPosition(_, c, kind) }
+      TReturnPosition0(DataFlowCallable c, ReturnKindExt kind) {
+        exists(ReturnNodeExt ret |
+          c = returnNodeGetEnclosingCallable(ret) and
+          kind = ret.getKind()
+        )
+      }
 
     cached
     newtype TLocalFlowCallContext =
       TAnyLocalCall() or
       TSpecificLocalCall(DataFlowCall call) { isUnreachableInCall(_, call) }
+
+    cached
+    newtype TReturnKindExt =
+      TValueReturn(ReturnKind kind) or
+      TParamUpdate(int pos) { exists(ParameterNode p | p.isParameterOf(_, pos)) }
+
+    cached
+    newtype TNodeExt =
+      TNormalNode(Node n) or
+      TReadStoreNode(DataFlowCall call, Node node1, Node node2, Content f1, Content f2) {
+        FlowThrough::argumentValueFlowsThrough(call, node1, node2, TContentSome(f1),
+          TContentSome(f2), _)
+      }
   }
 
-  pragma[noinline]
-  private predicate returnPosition(ReturnNodeExt ret, DataFlowCallable c, ReturnKindExt kind) {
-    c = returnNodeGetEnclosingCallable(ret) and
-    kind = ret.getKind()
+  /**
+   * An extended data flow node. Either a normal node, or an intermediate node
+   * used to split up a read+store step through a call into first a read step
+   * followed by a store step.
+   *
+   * This is purely an internal implementation detail.
+   */
+  class NodeExt extends TNodeExt {
+    /** Gets the underlying (normal) node, if any. */
+    Node getNode() { this = TNormalNode(result) }
+
+    DataFlowType getErasedNodeTypeBound() {
+      result = getErasedRepr(this.getNode().getTypeBound())
+      or
+      exists(Content f | this = TReadStoreNode(_, _, _, f, _) | result = f.getContainerType())
+    }
+
+    DataFlowCallable getEnclosingCallable() {
+      result = this.getNode().getEnclosingCallable()
+      or
+      exists(Node n | this = TReadStoreNode(_, n, _, _, _) | result = n.getEnclosingCallable())
+    }
+
+    string toString() {
+      exists(Node n | this = TNormalNode(n) | result = n.toString())
+      or
+      exists(DataFlowCall call | this = TReadStoreNode(call, _, _, _, _) |
+        result = "(inside) " + call.toString()
+      )
+    }
+
+    DataFlowLocation getLocation() {
+      exists(Node n | this = TNormalNode(n) | result = n.getLocation())
+      or
+      exists(DataFlowCall call | this = TReadStoreNode(call, _, _, _, _) |
+        result = call.getLocation()
+      )
+    }
+  }
+
+  /** Provides various `NodeExt` wrappers around corresponding normal nodes. */
+  private module NodeExts {
+    class ReturnNodeExtExt extends NodeExt {
+      private ReturnNodeExt ret;
+
+      ReturnNodeExtExt() { this = TNormalNode(ret) }
+
+      override ReturnNodeExt getNode() { result = ret }
+    }
+
+    class ParameterNodeExt extends NodeExt {
+      private ParameterNode p;
+
+      ParameterNodeExt() { this = TNormalNode(p) }
+
+      override ParameterNode getNode() { result = p }
+    }
+
+    class ArgumentNodeExt extends NodeExt {
+      private ArgumentNode arg;
+
+      ArgumentNodeExt() { this = TNormalNode(arg) }
+
+      override ArgumentNode getNode() { result = arg }
+    }
+
+    /**
+     * A `Node` at which a cast can occur such that the type should be checked.
+     */
+    class CastingNodeExt extends NodeExt {
+      CastingNodeExt() {
+        exists(Node n | n = this.getNode() |
+          n instanceof ParameterNode or
+          n instanceof CastNode or
+          n instanceof OutNode or
+          n.(PostUpdateNode).getPreUpdateNode() instanceof ArgumentNode
+        )
+      }
+    }
+  }
+
+  import NodeExts
+
+  private newtype TContentOption =
+    TContentNone() or
+    TContentSome(Content f)
+
+  private class ContentOption extends TContentOption {
+    Content getContent() { this = TContentSome(result) }
+
+    predicate hasContent() { exists(this.getContent()) }
+
+    string toString() {
+      result = this.getContent().toString()
+      or
+      not this.hasContent() and
+      result = ""
+    }
   }
 
   /**
@@ -719,7 +842,7 @@ private module ImplCommon {
   class ReturnNodeExt extends Node {
     ReturnNodeExt() {
       this instanceof ReturnNode or
-      parameterValueFlowsToUpdate(_, this)
+      parameterValueFlowsToPreUpdate(_, this)
     }
 
     /** Gets the kind of this returned value. */
@@ -727,18 +850,12 @@ private module ImplCommon {
       result = TValueReturn(this.(ReturnNode).getKind())
       or
       exists(ParameterNode p, int pos |
-        parameterValueFlowsToUpdate(p, this) and
+        parameterValueFlowsToPreUpdate(p, this) and
         p.isParameterOf(_, pos) and
         result = TParamUpdate(pos)
       )
     }
   }
-
-  private newtype TReturnKindExt =
-    TValueReturn(ReturnKind kind) or
-    TParamUpdate(int pos) {
-      exists(ParameterNode p | parameterValueFlowsToUpdate(p, _) and p.isParameterOf(_, pos))
-    }
 
   /**
    * An extended return kind. A return kind describes how data can be returned
@@ -774,9 +891,9 @@ private module ImplCommon {
 
     override string toString() { result = "param update " + pos }
 
-    override Node getAnOutNode(DataFlowCall call) {
+    override PostUpdateNode getAnOutNode(DataFlowCall call) {
       exists(ArgumentNode arg |
-        result.(PostUpdateNode).getPreUpdateNode() = arg and
+        result.getPreUpdateNode() = arg and
         arg.argumentOf(call, this.getPosition())
       )
     }
@@ -800,14 +917,15 @@ private module ImplCommon {
   }
 
   pragma[noinline]
-  DataFlowCallable returnNodeGetEnclosingCallable(ReturnNodeExt ret) {
+  private DataFlowCallable returnNodeGetEnclosingCallable(ReturnNodeExt ret) {
     result = ret.getEnclosingCallable()
   }
 
   pragma[noinline]
-  ReturnPosition getReturnPosition(ReturnNodeExt ret) {
-    exists(DataFlowCallable c, ReturnKindExt k | returnPosition(ret, c, k) |
-      result = TReturnPosition0(c, k)
+  ReturnPosition getReturnPosition(ReturnNodeExtExt ret) {
+    exists(ReturnNodeExt ret0 |
+      ret0 = ret.getNode() and
+      result = TReturnPosition0(returnNodeGetEnclosingCallable(ret0), ret0.getKind())
     )
   }
 
@@ -906,9 +1024,6 @@ private module ImplCommon {
       this = TSummaryReadVal(_)
     }
   }
-
-  pragma[noinline]
-  DataFlowType getErasedNodeType(Node n) { result = getErasedRepr(n.getType()) }
 
   pragma[noinline]
   DataFlowType getErasedNodeTypeBound(Node n) { result = getErasedRepr(n.getTypeBound()) }
