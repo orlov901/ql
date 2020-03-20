@@ -711,23 +711,16 @@ private predicate argumentFlowsThrough(
   )
 }
 
-pragma[noinline]
-private predicate readStoreNode(
-  DataFlowCall call, ArgumentNode arg, Content f1, Configuration config
-) {
-  exists(Content f2, Node out |
-    argumentValueFlowsThrough(call, arg, TContentSome(f1), TContentSome(f2), out) and
-    nodeCand1(out, config) and
-    readStoreCand1(f2, unbind(config))
-  )
-}
-
 private newtype TNodeExt =
   TNormalNode(Node node) { nodeCand1(node, _) } or
   TReadStoreNode(DataFlowCall call, ArgumentNode arg, Content f1, Configuration config) {
-    nodeCand1(arg, config) and
-    readStoreNode(call, arg, f1, config) and
-    readStoreCand1(f1, unbind(config))
+    exists(Content f2, Node out |
+      nodeCand1(arg, config) and
+      argumentValueFlowsThrough(call, arg, TContentSome(f1), TContentSome(f2), out) and
+      nodeCand1(out, unbind(config)) and
+      readStoreCand1(f1, unbind(config)) and
+      readStoreCand1(f2, unbind(config))
+    )
   } or
   TReadTaintNode(ArgumentNode arg, Content f, Configuration config) {
     argumentFlowsThrough(arg, _, _, _, TSummaryReadTaint(f), config)
