@@ -542,6 +542,7 @@ private predicate throughFlowNodeCand1(Node node, Configuration config) {
 }
 
 /** Holds if flow may return from `callable`. */
+pragma[nomagic]
 private predicate returnFlowCallableNodeCand1(
   DataFlowCallable callable, ReturnKindExt kind, Configuration config
 ) {
